@@ -295,14 +295,26 @@ async function sbDelete(table,filters){
   if(!r.ok) throw new Error('DELETE failed '+r.status);
 }
 
-/* ─── EMAILJS ─── */
-async function tgPayment(order,payMethod){
+/* ─── TELEGRAM NOTIFICATIONS ───
+   Routed through /api/notify-telegram (a Vercel server function) instead of
+   calling Telegram directly — keeps the bot token out of this file entirely.
+   Token lives in Vercel's Environment Variables now, not in the repo. */
+async function notifyTelegram(message){
   try{
-    var now=new Date().toLocaleDateString('en-PH',{year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'});
-    var ilist=(order.items||[]).map(function(i){return '- '+(i.variant?i.variant+' ':'')+i.name+' x'+i.qty;}).join('\n');
-    var msg='Payment Proof Received!\nHotel: '+order.hotel_name+'\nOrder: '+order.id+'\nSubmitted: '+now+'\nPayment via: '+(payMethod||'Not specified')+'\n\nItems:\n'+ilist+'\n\nCourier: '+order.courier+'\nShipping: P'+(order.shipping_fee||0).toFixed(2)+'\nTOTAL TO VERIFY: P'+(order.total||0).toFixed(2)+'\n\nPlease verify and mark PAID in Command Center.';
-    await tgSend(msg);
-  }catch(e){console.warn('TG payment:',e);}
+    const r=await fetch('/api/notify-telegram',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({message})
+    });
+    if(!r.ok){const t=await r.text();console.warn('Telegram proxy error:',t);}
+  }catch(e){console.warn('Telegram notify exception:',e);}
+}
+
+async function tgPayment(order,payMethod){
+  var now=new Date().toLocaleDateString('en-PH',{year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'});
+  var ilist=(order.items||[]).map(function(i){return '- '+(i.variant?i.variant+' ':'')+i.name+' x'+i.qty;}).join('\n');
+  var msg='Payment Proof Received!\nHotel: '+order.hotel_name+'\nOrder: '+order.id+'\nSubmitted: '+now+'\nPayment via: '+(payMethod||'Not specified')+'\n\nItems:\n'+ilist+'\n\nCourier: '+order.courier+'\nShipping: P'+(order.shipping_fee||0).toFixed(2)+'\nTOTAL TO VERIFY: P'+(order.total||0).toFixed(2)+'\n\nPlease verify and mark PAID in Command Center.';
+  await notifyTelegram(msg);
 }
 async function sendEmail(order){
   try{
@@ -336,42 +348,27 @@ async function sendEmail(order){
   }catch(e){console.warn('Email exception:',e);}
 }
 
-/* ─── TELEGRAM NOTIFICATIONS ─── */
-const TG_TOKEN = '8958712875:AAGxcajk7pTyVEDVvGT9aTytj8ECZU3iUAY';
-const TG_CHAT  = '1744671476';
-
 async function sendTelegram(order){
-  try{
-    const items = (order.items||[]).map(i=>
-      `  • ${i.variant?i.variant+' ':''}${i.name} ×${i.qty} = ₱${i.subtotal.toFixed(2)}`
-    ).join('\n');
+  const items = (order.items||[]).map(i=>
+    `  • ${i.variant?i.variant+' ':''}${i.name} ×${i.qty} = ₱${i.subtotal.toFixed(2)}`
+  ).join('\n');
 
-    const msg =
-      `🧼 *New Order — Mike Charlie Co.*\n` +
-      `━━━━━━━━━━━━━━━━━━━━\n` +
-      `🏨 *Hotel:* ${order.hotel_name}\n` +
-      `🆔 *Order ID:* ${order.id}\n` +
-      `📅 *Date:* ${order.date_label}\n\n` +
-      `*Items Ordered:*\n${items}\n\n` +
-      `🚚 *Courier:* ${order.courier}\n` +
-      `📦 *Shipping:* ₱${order.shipping_fee.toFixed(2)}\n` +
-      `💰 *Products:* ₱${order.prod_total.toFixed(2)}\n` +
-      `✅ *TOTAL: ₱${order.total.toFixed(2)}*\n` +
-      `━━━━━━━━━━━━━━━━━━━━\n` +
-      `${order.notes?'📝 Notes: '+order.notes+'\n':''}` +
-      `⏳ Payment status: UNPAID`;
+  const msg =
+    `🧼 *New Order — Mike Charlie Co.*\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `🏨 *Hotel:* ${order.hotel_name}\n` +
+    `🆔 *Order ID:* ${order.id}\n` +
+    `📅 *Date:* ${order.date_label}\n\n` +
+    `*Items Ordered:*\n${items}\n\n` +
+    `🚚 *Courier:* ${order.courier}\n` +
+    `📦 *Shipping:* ₱${order.shipping_fee.toFixed(2)}\n` +
+    `💰 *Products:* ₱${order.prod_total.toFixed(2)}\n` +
+    `✅ *TOTAL: ₱${order.total.toFixed(2)}*\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `${order.notes?'📝 Notes: '+order.notes+'\n':''}` +
+    `⏳ Payment status: UNPAID`;
 
-    await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        chat_id: TG_CHAT,
-        text: msg,
-        parse_mode: 'Markdown'
-      })
-    });
-    console.log('Telegram notification sent!');
-  }catch(e){console.warn('Telegram error:',e);}
+  await notifyTelegram(msg);
 }
 
 /* ─── CONFIG ─── */
