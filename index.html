@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mike Charlie Co. — Coming Soon</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --lagoon:#3E5F5C;--lagoon-dark:#2C4542;--teal:#729A94;--teal-light:#A8C5C0;
+  --golden:#D1A679;--golden-dark:#B8905F;--sand:#E6D5C3;--sand-light:#F0E8DA;
+  --pearl:#F7F3EC;--white:#FFFFFF;
+  --text-dark:#1C2E2C;--text-mid:#4A6862;--text-muted:#8FA9A4;
+  --danger:#C1121F;--danger-bg:#FFE8E8;--danger-border:#F5A0A0;
+  --success:#2D6A4F;--success-bg:#D8F3DC;--success-border:#A3D9B1;
+  --shadow:0 2px 12px rgba(62,95,92,0.09);
+  --shadow-lg:0 8px 36px rgba(62,95,92,0.18);
+}
+body{font-family:'DM Sans',sans-serif;background:var(--pearl);color:var(--text-dark);min-height:100vh}
+h1,h2,h3{font-family:'Cormorant Garamond',serif}
+button{font-family:'DM Sans',sans-serif;cursor:pointer}
+
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:1.25rem 1.5rem;max-width:1100px;margin:0 auto}
+.hdr h1{font-size:1.15rem;color:var(--lagoon)}
+.hdr-sub{font-size:10px;letter-spacing:.12em;color:var(--text-muted);text-transform:uppercase;margin-top:1px}
+.auth-link{background:var(--lagoon);color:var(--pearl);border:none;border-radius:9px;padding:9px 18px;font-size:13px;font-weight:500}
+
+.hero{max-width:600px;margin:6vh auto 0;text-align:center;padding:0 1.5rem}
+.hero h2{font-size:2.4rem;color:var(--lagoon);margin-bottom:10px;line-height:1.15}
+.hero p{font-size:15px;color:var(--text-mid);line-height:1.6;margin-bottom:2rem}
+.leaf{font-size:38px;margin-bottom:1rem}
+
+.contact-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:420px;margin:0 auto;padding:0 1.5rem}
+.contact-btn{display:flex;flex-direction:column;align-items:center;background:white;border:1px solid var(--sand);border-radius:10px;padding:12px 6px;text-decoration:none;gap:4px;box-shadow:var(--shadow)}
+.contact-btn span:first-child{font-size:20px}
+.contact-btn span:last-child{font-size:11px;font-weight:600;color:var(--text-dark)}
+.contact-lbl{text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin:2.5rem 0 .75rem}
+
+/* MODAL */
+.modal{position:fixed;inset:0;background:rgba(28,46,44,.65);z-index:200;display:none;align-items:center;justify-content:center;padding:1rem}
+.modal.show{display:flex}
+.modal-box{background:white;border-radius:16px;padding:2rem 1.75rem;width:100%;max-width:380px;box-shadow:var(--shadow-lg);position:relative}
+.modal-close{position:absolute;top:12px;right:14px;background:var(--sand);border:none;border-radius:50%;width:30px;height:30px;font-size:16px;display:flex;align-items:center;justify-content:center;color:var(--text-mid)}
+.modal-box h2{font-size:1.5rem;color:var(--lagoon);text-align:center;margin-bottom:1.25rem}
+.auth-tabs{display:flex;background:var(--pearl);border-radius:9px;padding:3px;margin-bottom:1.25rem}
+.auth-tab{flex:1;padding:8px;border:none;background:none;border-radius:7px;font-size:13px;font-weight:500;color:var(--text-muted)}
+.auth-tab.on{background:white;color:var(--lagoon);box-shadow:var(--shadow)}
+.lbl{display:block;font-size:13px;color:var(--text-mid);margin-bottom:5px;font-weight:500}
+.inp{width:100%;padding:11px 12px;border:1.5px solid var(--sand);border-radius:9px;font-size:14px;margin-bottom:12px;outline:none}
+.inp:focus{border-color:var(--teal)}
+.btn{display:block;width:100%;padding:12px;border-radius:9px;font-size:14px;font-weight:500;border:none;text-align:center}
+.btn-p{background:var(--lagoon);color:var(--pearl)}
+.auth-err{background:var(--danger-bg);border:1px solid var(--danger-border);color:var(--danger);font-size:13px;padding:9px 12px;border-radius:8px;margin-bottom:12px;display:none}
+.auth-ok{background:var(--success-bg);border:1px solid var(--success-border);color:var(--success);text-align:center;padding:1.5rem 1rem;border-radius:9px}
+.auth-ok h3{color:var(--success);margin-bottom:6px}
+.auth-ok p{font-size:13px;color:var(--text-mid);line-height:1.5}
+.gmail-note{text-align:center;font-size:11px;color:var(--text-muted);margin-top:14px}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div><h1>Mike Charlie Co.</h1><div class="hdr-sub">Your Planet-Kind Essentials, Simplified</div></div>
+  <button class="auth-link" id="auth-link" onclick="openAuthModal()">Log In / Sign Up</button>
+</div>
+
+<div class="hero">
+  <div class="leaf">🌿</div>
+  <h2>Something good<br>is on its way.</h2>
+  <p>We're building a new home for zero-waste shampoo bars, body bars, and everyday essentials — made by hand, made to last. In the meantime, reach us directly below, or create an account now so you're ready the moment we launch.</p>
+</div>
+
+<div class="contact-lbl">Reach Us Directly</div>
+<div class="contact-grid">
+  <a class="contact-btn" href="https://wa.me/message/T7LXVS3L74A5C1" target="_blank"><span>💬</span><span>WhatsApp</span></a>
+  <a class="contact-btn" href="viber://add?number=639760467782" target="_blank"><span>📳</span><span>Viber</span></a>
+  <a class="contact-btn" href="imessage://+639760467782" target="_blank"><span>📱</span><span>iMessage</span></a>
+  <a class="contact-btn" href="https://www.instagram.com/mikecharlieco/" target="_blank"><span>📸</span><span>Instagram</span></a>
+  <a class="contact-btn" href="https://m.me/mikecharlieco" target="_blank"><span>👥</span><span>Facebook</span></a>
+  <a class="contact-btn" href="https://www.threads.com/mikecharlieco/" target="_blank"><span>🧵</span><span>Threads</span></a>
+</div>
+
+<!-- AUTH MODAL -->
+<div id="auth-modal" class="modal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeAuthModal()">✕</button>
+    <div id="auth-content">
+      <h2>Welcome</h2>
+      <div class="auth-tabs">
+        <button class="auth-tab on" id="tab-signin" onclick="setAuthMode('signin')">Log In</button>
+        <button class="auth-tab" id="tab-signup" onclick="setAuthMode('signup')">Sign Up</button>
+      </div>
+      <div class="auth-err" id="auth-err"></div>
+      <label class="lbl">Email</label>
+      <input class="inp" type="email" id="auth-email" placeholder="you@email.com">
+      <label class="lbl">Password</label>
+      <input class="inp" type="password" id="auth-pw" placeholder="••••••••">
+      <button class="btn btn-p" id="auth-submit" onclick="submitAuth()">Log In</button>
+      <p class="gmail-note">Sign in with Google is coming soon — email works for now.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const SB_URL='https://cdczxunygdmswgdzkbed.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkY3p4dW55Z2Rtc3dnZHprYmVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxOTg5NjksImV4cCI6MjEwMjc3NDk2OX0.IrC05NPev5Zp6uV0DMe0gZI3boQsqXuTYSTVdyn8oWg';
+const SESSION_KEY='mcc_customer_session';
+let authMode='signin';
+
+function saveSession(data){
+  localStorage.setItem(SESSION_KEY, JSON.stringify({
+    access_token:data.access_token, refresh_token:data.refresh_token,
+    expires_at:Date.now()+((data.expires_in||3600)*1000), user:data.user
+  }));
+}
+function loadSession(){try{const raw=localStorage.getItem(SESSION_KEY);return raw?JSON.parse(raw):null;}catch(e){return null;}}
+function clearSession(){localStorage.removeItem(SESSION_KEY);}
+
+function openAuthModal(){document.getElementById('auth-modal').classList.add('show');}
+function closeAuthModal(){document.getElementById('auth-modal').classList.remove('show');}
+
+function setAuthMode(mode){
+  authMode=mode;
+  document.getElementById('tab-signin').classList.toggle('on',mode==='signin');
+  document.getElementById('tab-signup').classList.toggle('on',mode==='signup');
+  document.getElementById('auth-submit').textContent=mode==='signin'?'Log In':'Create Account';
+  document.getElementById('auth-err').style.display='none';
+}
+
+async function submitAuth(){
+  const email=document.getElementById('auth-email').value.trim();
+  const pw=document.getElementById('auth-pw').value;
+  const errBox=document.getElementById('auth-err');
+  errBox.style.display='none';
+  if(!email||!pw){errBox.textContent='Enter your email and password.';errBox.style.display='block';return;}
+  const btn=document.getElementById('auth-submit');
+  const origLabel=btn.textContent;btn.textContent='Please wait...';btn.disabled=true;
+  try{
+    const endpoint = authMode==='signin' ? 'token?grant_type=password' : 'signup';
+    const r=await fetch(`${SB_URL}/auth/v1/${endpoint}`,{
+      method:'POST',
+      headers:{'apikey':SB_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({email,password:pw})
+    });
+    const data=await r.json();
+    if(!r.ok) throw new Error(data.error_description||data.msg||'Something went wrong.');
+    if(authMode==='signup' && !data.access_token){
+      // Email confirmation required before a session exists
+      showAuthSuccess("Almost there!", "Check your email to confirm your account, then log in.");
+      return;
+    }
+    saveSession(data);
+    showLoggedInState(data.user.email);
+  }catch(e){
+    errBox.textContent=e.message;errBox.style.display='block';
+  }finally{
+    btn.textContent=origLabel;btn.disabled=false;
+  }
+}
+
+function showAuthSuccess(title,body){
+  document.getElementById('auth-content').innerHTML=`
+    <div class="auth-ok"><h3>${title}</h3><p>${body}</p></div>`;
+}
+function showLoggedInState(email){
+  document.getElementById('auth-link').textContent='My Account';
+  document.getElementById('auth-content').innerHTML=`
+    <div class="auth-ok">
+      <h3>You're in! 🌿</h3>
+      <p>Logged in as <strong>${email}</strong>. The shop isn't open yet, but your account is ready — order history and everything else will show up here once we launch.</p>
+    </div>
+    <button class="btn btn-p" style="margin-top:14px" onclick="doLogout()">Log Out</button>`;
+}
+
+function doLogout(){
+  clearSession();
+  document.getElementById('auth-link').textContent='Log In / Sign Up';
+  document.getElementById('auth-content').innerHTML=`
+    <h2>Welcome</h2>
+    <div class="auth-tabs">
+      <button class="auth-tab on" id="tab-signin" onclick="setAuthMode('signin')">Log In</button>
+      <button class="auth-tab" id="tab-signup" onclick="setAuthMode('signup')">Sign Up</button>
+    </div>
+    <div class="auth-err" id="auth-err"></div>
+    <label class="lbl">Email</label>
+    <input class="inp" type="email" id="auth-email" placeholder="you@email.com">
+    <label class="lbl">Password</label>
+    <input class="inp" type="password" id="auth-pw" placeholder="••••••••">
+    <button class="btn btn-p" id="auth-submit" onclick="submitAuth()">Log In</button>
+    <p class="gmail-note">Sign in with Google is coming soon — email works for now.</p>`;
+  authMode='signin';
+  closeAuthModal();
+}
+
+// Restore session on load, if valid
+(function(){
+  const session=loadSession();
+  if(session && Date.now()<session.expires_at){
+    document.getElementById('auth-link').textContent='My Account';
+    document.getElementById('auth-link').onclick=function(){openAuthModal();showLoggedInState(session.user.email);};
+  }
+})();
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter' && document.getElementById('auth-modal').classList.contains('show')){
+    const active=document.activeElement;
+    if(active && (active.id==='auth-email'||active.id==='auth-pw'))submitAuth();
+  }
+});
+</script>
+</body>
+</html>
