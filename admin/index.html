@@ -258,6 +258,33 @@ tbody tr:hover td.frz{background:var(--pearl)}
   </div>
 </div>
 
+<!-- CREATE PARTNER ACCOUNT MODAL -->
+<div id="partner-modal" class="modal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal('partner-modal')">✕</button>
+    <div class="modal-title">Create Partner Account</div>
+    <div class="modal-sub">Give a hotel or retail partner their own login. Share these credentials with them directly — nothing gets emailed automatically.</div>
+    <div class="auth-err" id="partner-err" style="display:none;background:var(--danger-bg);border:1px solid var(--danger-border);color:var(--danger);font-size:13px;padding:9px 12px;border-radius:8px;margin-bottom:12px"></div>
+    <label class="lbl">Account Type</label>
+    <select class="inp" id="partner-role">
+      <option value="hotel">Hotel Partner</option>
+      <option value="retail_partner">Retail Partner</option>
+    </select>
+    <label class="lbl">Business Name</label>
+    <input class="inp" id="partner-bizname" placeholder="e.g. Tongo Hill Cottages">
+    <label class="lbl">Email</label>
+    <input class="inp" type="email" id="partner-email" placeholder="their@email.com">
+    <label class="lbl">Temporary Password</label>
+    <div style="display:flex;gap:8px">
+      <input class="inp" id="partner-pw" placeholder="At least 8 characters" style="flex:1">
+      <button class="btn btn-o btn-sm" type="button" onclick="generatePartnerPw()">Generate</button>
+    </div>
+    <p class="t-muted" style="font-size:11px;margin:-6px 0 12px">They can change this themselves later — you'll still have full admin access either way.</p>
+    <button class="btn btn-p btn-block" id="partner-submit" onclick="submitPartnerAccount()">Create Account</button>
+  </div>
+</div>
+
+
 <script>
 /* ─── SUPABASE ─── */
 const SB_URL='https://cdczxunygdmswgdzkbed.supabase.co';
@@ -994,6 +1021,11 @@ async function renderHome(){
       <div class="stat-box"><div class="stat-num">${inMonth.length}</div><div class="stat-lbl">Sales — This Month</div></div>
     </div>
     <div class="card">
+      <div class="card-title">🤝 Partners</div>
+      <p class="t-muted" style="font-size:13px;margin-bottom:12px">Give a vetted hotel or retail partner their own login.</p>
+      <button class="btn btn-p btn-sm" onclick="openPartnerModal()">+ Create Partner Account</button>
+    </div>
+    <div class="card">
       <div class="card-title">🔥 Top 5 Fastest-Moving — This Week</div>
       ${moverListHtml(moversWeek)}
     </div>
@@ -1088,6 +1120,51 @@ async function renderSalesLog(){
   }
 }
 function fmtDate(iso){return new Date(iso).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'});}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CREATE PARTNER ACCOUNT
+   ═══════════════════════════════════════════════════════════════════════ */
+function openPartnerModal(){
+  $('partner-role').value='hotel';
+  $('partner-bizname').value='';
+  $('partner-email').value='';
+  $('partner-pw').value='';
+  $('partner-err').style.display='none';
+  openModal('partner-modal');
+}
+function generatePartnerPw(){
+  const chars='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  let pw='';
+  for(let i=0;i<10;i++)pw+=chars[Math.floor(Math.random()*chars.length)];
+  $('partner-pw').value=pw;
+}
+async function submitPartnerAccount(){
+  const role=$('partner-role').value;
+  const bizName=$('partner-bizname').value.trim();
+  const email=$('partner-email').value.trim();
+  const pw=$('partner-pw').value;
+  const errBox=$('partner-err');
+  errBox.style.display='none';
+  if(!bizName||!email||!pw){errBox.textContent='All fields are required.';errBox.style.display='block';return;}
+  if(pw.length<8){errBox.textContent='Password must be at least 8 characters.';errBox.style.display='block';return;}
+
+  const btn=$('partner-submit');btn.textContent='Creating...';btn.disabled=true;
+  try{
+    const r=await fetch('/api/create-partner-account',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({adminAccessToken:ACCESS_TOKEN, email, password:pw, role, businessName:bizName})
+    });
+    const data=await r.json();
+    if(!r.ok) throw new Error(data.error||'Failed to create account');
+    toast('✓ Account created! Share the email + password with them directly.');
+    closeModal('partner-modal');
+  }catch(e){
+    errBox.textContent=e.message;errBox.style.display='block';
+  }finally{
+    btn.textContent='Create Account';btn.disabled=false;
+  }
+}
 
 /* ═══════════════════════════════════════════════════════════════════════
    DATA REPORTS TAB
