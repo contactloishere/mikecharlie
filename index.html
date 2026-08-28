@@ -56,12 +56,20 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer}
 .auth-ok h3{color:var(--success);margin-bottom:6px}
 .auth-ok p{font-size:13px;color:var(--text-mid);line-height:1.5}
 .gmail-note{text-align:center;font-size:11px;color:var(--text-muted);margin-top:14px}
+
+/* ROLE SELECTOR */
+.role-grid{display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:16px}
+.role-card{display:flex;align-items:center;gap:12px;border:1.5px solid var(--sand);border-radius:10px;padding:12px 14px;cursor:pointer;background:white;text-align:left}
+.role-card.on{border-color:var(--lagoon);background:var(--pearl)}
+.role-card .ri{font-size:22px}
+.role-card .rt{font-weight:600;font-size:13px;color:var(--text-dark)}
+.role-card .rd{font-size:11px;color:var(--text-muted);margin-top:1px}
 </style>
 </head>
 <body>
 
 <div class="hdr">
-  <div><h1>Mike Charlie Co.</h1><div class="hdr-sub">Your Planet-Kind Essentials, Simplified</div></div>
+  <div><h1>Mike Charlie Co.</h1><div class="hdr-sub">Good Things for Everyday<br>Filipino-Made Soaps and Goods</div></div>
   <button class="auth-link" id="auth-link" onclick="openAuthModal()">Log In / Sign Up</button>
 </div>
 
@@ -102,6 +110,27 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer}
   </div>
 </div>
 
+<!-- PARTNER LEAD MODAL -->
+<div id="lead-modal" class="modal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeLeadModal()">✕</button>
+    <div id="lead-content">
+      <h2>Partner With Us</h2>
+      <p style="font-size:13px;color:var(--text-mid);text-align:center;margin-bottom:16px">Tell us a bit about your business — we'll reach out personally.</p>
+      <div class="auth-err" id="lead-err"></div>
+      <label class="lbl">Your Name</label>
+      <input class="inp" id="lead-name" placeholder="Your full name">
+      <label class="lbl">Email</label>
+      <input class="inp" type="email" id="lead-email" placeholder="you@email.com">
+      <label class="lbl">Business Name</label>
+      <input class="inp" id="lead-biz" placeholder="e.g. Sunset Cafe">
+      <label class="lbl">Message (optional)</label>
+      <textarea class="inp" id="lead-msg" placeholder="Tell us a bit about your business"></textarea>
+      <button class="btn btn-p" id="lead-submit" onclick="submitLead()">Send Inquiry</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const SB_URL='https://cdczxunygdmswgdzkbed.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkY3p4dW55Z2Rtc3dnZHprYmVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxOTg5NjksImV4cCI6MjEwMjc3NDk2OX0.IrC05NPev5Zp6uV0DMe0gZI3boQsqXuTYSTVdyn8oWg';
@@ -120,12 +149,46 @@ function clearSession(){localStorage.removeItem(SESSION_KEY);}
 function openAuthModal(){document.getElementById('auth-modal').classList.add('show');}
 function closeAuthModal(){document.getElementById('auth-modal').classList.remove('show');}
 
+function signInFormHtml(){
+  return `<h2>Welcome</h2>
+    <div class="auth-tabs">
+      <button class="auth-tab on" id="tab-signin" onclick="setAuthMode('signin')">Log In</button>
+      <button class="auth-tab" id="tab-signup" onclick="setAuthMode('signup')">Sign Up</button>
+    </div>
+    <div class="auth-err" id="auth-err"></div>
+    <label class="lbl">Email</label>
+    <input class="inp" type="email" id="auth-email" placeholder="you@email.com">
+    <label class="lbl">Password</label>
+    <input class="inp" type="password" id="auth-pw" placeholder="••••••••">
+    <button class="btn btn-p" id="auth-submit" onclick="submitAuth()">Log In</button>
+    <p class="gmail-note">Sign in with Google is coming soon — email works for now.</p>`;
+}
+function signUpFormHtml(){
+  return `<h2>Welcome</h2>
+    <div class="auth-tabs">
+      <button class="auth-tab" id="tab-signin" onclick="setAuthMode('signin')">Log In</button>
+      <button class="auth-tab on" id="tab-signup" onclick="setAuthMode('signup')">Sign Up</button>
+    </div>
+    <div class="auth-err" id="auth-err"></div>
+    <label class="lbl">Email</label>
+    <input class="inp" type="email" id="auth-email" placeholder="you@email.com">
+    <label class="lbl">Password</label>
+    <input class="inp" type="password" id="auth-pw" placeholder="••••••••">
+    <button class="btn btn-p" id="auth-submit" onclick="submitAuth()">Create Account</button>
+    <p class="gmail-note">Sign in with Google is coming soon — email works for now.</p>
+    <p class="gmail-note">Own a hotel, cafe, or shop? <a href="#" onclick="closeAuthModal();openLeadModal();return false;" style="color:var(--lagoon);font-weight:600">Ask about becoming a partner →</a></p>`;
+}
 function setAuthMode(mode){
   authMode=mode;
-  document.getElementById('tab-signin').classList.toggle('on',mode==='signin');
-  document.getElementById('tab-signup').classList.toggle('on',mode==='signup');
-  document.getElementById('auth-submit').textContent=mode==='signin'?'Log In':'Create Account';
-  document.getElementById('auth-err').style.display='none';
+  document.getElementById('auth-content').innerHTML = mode==='signin' ? signInFormHtml() : signUpFormHtml();
+}
+
+async function notifyTelegram(message){
+  try{
+    await fetch('/api/notify-telegram',{
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})
+    });
+  }catch(e){console.warn('Telegram notify failed:',e);}
 }
 
 async function submitAuth(){
@@ -146,7 +209,6 @@ async function submitAuth(){
     const data=await r.json();
     if(!r.ok) throw new Error(data.error_description||data.msg||'Something went wrong.');
     if(authMode==='signup' && !data.access_token){
-      // Email confirmation required before a session exists
       showAuthSuccess("Almost there!", "Check your email to confirm your account, then log in.");
       return;
     }
@@ -176,20 +238,8 @@ function showLoggedInState(email){
 function doLogout(){
   clearSession();
   document.getElementById('auth-link').textContent='Log In / Sign Up';
-  document.getElementById('auth-content').innerHTML=`
-    <h2>Welcome</h2>
-    <div class="auth-tabs">
-      <button class="auth-tab on" id="tab-signin" onclick="setAuthMode('signin')">Log In</button>
-      <button class="auth-tab" id="tab-signup" onclick="setAuthMode('signup')">Sign Up</button>
-    </div>
-    <div class="auth-err" id="auth-err"></div>
-    <label class="lbl">Email</label>
-    <input class="inp" type="email" id="auth-email" placeholder="you@email.com">
-    <label class="lbl">Password</label>
-    <input class="inp" type="password" id="auth-pw" placeholder="••••••••">
-    <button class="btn btn-p" id="auth-submit" onclick="submitAuth()">Log In</button>
-    <p class="gmail-note">Sign in with Google is coming soon — email works for now.</p>`;
   authMode='signin';
+  document.getElementById('auth-content').innerHTML=signInFormHtml();
   closeAuthModal();
 }
 
@@ -208,6 +258,29 @@ document.addEventListener('keydown',e=>{
     if(active && (active.id==='auth-email'||active.id==='auth-pw'))submitAuth();
   }
 });
+
+/* ─── PARTNER LEAD FORM (no account created — just notifies Lois) ─── */
+function openLeadModal(){document.getElementById('lead-modal').classList.add('show');}
+function closeLeadModal(){document.getElementById('lead-modal').classList.remove('show');}
+async function submitLead(){
+  const name=document.getElementById('lead-name').value.trim();
+  const email=document.getElementById('lead-email').value.trim();
+  const biz=document.getElementById('lead-biz').value.trim();
+  const msg=document.getElementById('lead-msg').value.trim();
+  const errBox=document.getElementById('lead-err');
+  errBox.style.display='none';
+  if(!name||!email||!biz){errBox.textContent='Name, email, and business name are required.';errBox.style.display='block';return;}
+  const btn=document.getElementById('lead-submit');
+  const origLabel=btn.textContent;btn.textContent='Sending...';btn.disabled=true;
+  try{
+    await notifyTelegram(`🤝 *New Partnership Inquiry*\nName: ${name}\nEmail: ${email}\nBusiness: ${biz}\n${msg?'Message: '+msg:''}`);
+    document.getElementById('lead-content').innerHTML=`<div class="auth-ok"><h3>Thanks! 🌿</h3><p>We'll be in touch soon about partnering with ${biz}.</p></div>`;
+  }catch(e){
+    errBox.textContent='Something went wrong — try reaching us directly instead.';errBox.style.display='block';
+  }finally{
+    btn.textContent=origLabel;btn.disabled=false;
+  }
+}
 </script>
 </body>
 </html>
