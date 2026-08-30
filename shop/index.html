@@ -226,10 +226,20 @@ function saveLikes(){localStorage.setItem('mcc_likes',JSON.stringify([...S.likes
 /* ─── LOAD DATA ─── */
 async function init(){
   try{
-    const [skus,cats]=await Promise.all([
+    const [skus,cats,listings,variantPhotos]=await Promise.all([
       sbGet('skus','is_sellable=eq.true&is_active=eq.true&select=*,categories(id,name)&order=product_name.asc'),
-      sbGet('categories','select=*&order=display_order.asc')
+      sbGet('categories','select=*&order=display_order.asc'),
+      sbGet('product_listings','select=*'),
+      sbGet('variant_photos','select=sku_id,photo_url')
     ]);
+    const listingByTitle={};
+    listings.forEach(l=>listingByTitle[l.title]=l);
+    const photoBySku={};
+    variantPhotos.forEach(p=>{if(p.photo_url)photoBySku[p.sku_id]=p.photo_url;});
+    skus.forEach(s=>{
+      s.listing=listingByTitle[s.product_name]||{};
+      s.variantPhotoUrl=photoBySku[s.id]||null;
+    });
     S.skus=skus;S.categories=cats;
     groupProducts();
     renderCatBar();
@@ -249,13 +259,27 @@ function groupProducts(){
   });
   S.groups=Object.values(map);
 }
+function isTwoAxis(group){
+  return group.every(v=>v.variant_axis_1 && v.variant_axis_2);
+}
+function axis1Options(group){
+  return [...new Set(group.map(v=>v.variant_axis_1))];
+}
+function axis2Options(group,axis1){
+  return [...new Set(group.filter(v=>v.variant_axis_1===axis1).map(v=>v.variant_axis_2))];
+}
+function findByAxes(group,axis1,axis2){
+  return group.find(v=>v.variant_axis_1===axis1 && v.variant_axis_2===axis2);
+}
 
 /* ─── PRICING/IMAGES HELPERS ─── */
 function effectivePrice(sku){return (sku.is_on_sale && sku.sale_price!=null) ? sku.sale_price : sku.retail_price_direct;}
 function galleryFor(sku){
   const imgs=[];
-  if(sku.cover_image_url)imgs.push(sku.cover_image_url);
-  if(sku.gallery_image_urls)imgs.push(...sku.gallery_image_urls.filter(u=>u&&u!==sku.cover_image_url));
+  if(sku.variantPhotoUrl)imgs.push(sku.variantPhotoUrl);
+  const l=sku.listing||{};
+  [l.cover_image_url,l.image_1,l.image_2,l.image_3,l.image_4,l.image_5,l.image_6,l.image_7,l.image_8,l.image_9]
+    .forEach(u=>{if(u && !imgs.includes(u))imgs.push(u);});
   return imgs;
 }
 
@@ -287,6 +311,22 @@ function productCardHtml(group,gi){
   const price=effectivePrice(sku);
   const low=sku.current_stock<=sku.low_stock_threshold && sku.current_stock>0;
   const out=sku.current_stock<=0;
+  const twoAxis=isTwoAxis(group);
+  let variantControlHtml='';
+  if(twoAxis){
+    const a1opts=axis1Options(group);
+    const a2opts=axis2Options(group,a1opts[0]);
+    variantControlHtml=`<select class="pcard-variant" onclick="event.stopPropagation()" onchange="cardAxis1Change(${gi},this.value)" id="card-axis1-${gi}">
+        ${a1opts.map(a=>`<option>${a}</option>`).join('')}
+      </select>
+      <select class="pcard-variant" onclick="event.stopPropagation()" onchange="cardAxis2Change(${gi},this.value)" id="card-axis2-${gi}">
+        ${a2opts.map(a=>`<option>${a}</option>`).join('')}
+      </select>`;
+  }else if(group.length>1){
+    variantControlHtml=`<select class="pcard-variant" onclick="event.stopPropagation()" onchange="cardVariantChange(${gi},this.selectedIndex)">
+        ${group.map(v=>`<option>${v.variant||v.sku_code}</option>`).join('')}
+      </select>`;
+  }
   return `<div class="pcard">
     <div class="pcard-gallery" data-gi="${gi}">
       <div class="pcard-scroll" id="cardscroll-${gi}">
@@ -299,10 +339,8 @@ function productCardHtml(group,gi){
     </div>
     <div class="pcard-body" onclick="openDetail(${gi})">
       <div class="pcard-name">${group[0].product_name}</div>
-      ${sku.description?`<div class="pcard-desc">${sku.description}</div>`:''}
-      ${group.length>1?`<select class="pcard-variant" onclick="event.stopPropagation()" onchange="cardVariantChange(${gi},this.selectedIndex)">
-        ${group.map(v=>`<option>${v.variant||v.sku_code}</option>`).join('')}
-      </select>`:''}
+      ${sku.listing&&sku.listing.short_description?`<div class="pcard-desc">${sku.listing.short_description}</div>`:''}
+      ${variantControlHtml}
       <div class="pcard-price-row">
         <span class="pcard-price" id="cardprice-${gi}">${price!=null?P(price):'—'}</span>
         ${sku.is_on_sale&&sku.sale_price!=null?`<span class="pcard-strike" id="cardstrike-${gi}">${P(sku.retail_price_direct)}</span>`:''}
@@ -323,21 +361,43 @@ function scrollCard(gi,idx){
   const scroller=$('cardscroll-'+gi);
   if(scroller)scroller.scrollTo({left:idx*scroller.clientWidth,behavior:'smooth'});
 }
-function cardVariantChange(gi,variantIdx){
-  const group=filteredGroups()[gi];
-  const sku=group[variantIdx];
+function updateCardForSku(gi,sku){
   const price=effectivePrice(sku);
   $('cardprice-'+gi).textContent=price!=null?P(price):'—';
   const addBtn=$('cardadd-'+gi);
   const out=sku.current_stock<=0;
   addBtn.disabled=out;addBtn.textContent=out?'Out of Stock':'Add to Tote Bag';
-  addBtn.setAttribute('onclick',`event.stopPropagation();quickAddVariant(${gi},${variantIdx})`);
+  addBtn.dataset.skuId=sku.id;
+}
+function cardVariantChange(gi,variantIdx){
+  const group=filteredGroups()[gi];
+  const sku=group[variantIdx];
+  updateCardForSku(gi,sku);
+  $('cardadd-'+gi).setAttribute('onclick',`event.stopPropagation();quickAddVariant(${gi},${variantIdx})`);
+}
+function cardAxis1Change(gi,axis1){
+  const group=filteredGroups()[gi];
+  const a2opts=axis2Options(group,axis1);
+  const a2sel=$('card-axis2-'+gi);
+  a2sel.innerHTML=a2opts.map(a=>`<option>${a}</option>`).join('');
+  cardAxis2Change(gi,a2opts[0]);
+}
+function cardAxis2Change(gi,axis2){
+  const group=filteredGroups()[gi];
+  const axis1=$('card-axis1-'+gi).value;
+  const sku=findByAxes(group,axis1,axis2);
+  if(!sku)return;
+  updateCardForSku(gi,sku);
+  $('cardadd-'+gi).setAttribute('onclick',`event.stopPropagation();quickAddSku(${gi},'${sku.id}')`);
 }
 function quickAdd(gi){quickAddVariant(gi,0);}
 function quickAddVariant(gi,variantIdx){
   const group=filteredGroups()[gi];
   const sku=group[variantIdx];
   addToCart(sku.id,1);
+}
+function quickAddSku(gi,skuId){
+  addToCart(skuId,1);
 }
 function toggleLike(skuId,btn){
   if(S.likes.has(skuId)){S.likes.delete(skuId);btn.textContent='🤍';}
@@ -400,7 +460,28 @@ function renderDetail(group,variantIdx){
   const price=effectivePrice(sku);
   const low=sku.current_stock<=sku.low_stock_threshold && sku.current_stock>0;
   const out=sku.current_stock<=0;
-  const subs=sku.sub_descriptions||[];
+  const l=sku.listing||{};
+  const subs=[1,2,3,4].map(n=>({title:l['subsection_'+n+'_title'],body:l['subsection_'+n+'_body']})).filter(s=>s.title||s.body);
+  const twoAxis=isTwoAxis(group);
+
+  let variantControlHtml='';
+  if(twoAxis){
+    const a1opts=axis1Options(group);
+    const a2opts=axis2Options(group,sku.variant_axis_1);
+    variantControlHtml=`<label class="lbl">Color</label>
+      <select class="inp" id="detail-axis1" onchange="detailAxis1Change(this.value)">
+        ${a1opts.map(a=>`<option ${a===sku.variant_axis_1?'selected':''}>${a}</option>`).join('')}
+      </select>
+      <label class="lbl">Variant</label>
+      <select class="inp" id="detail-axis2" onchange="detailAxis2Change(this.value)">
+        ${a2opts.map(a=>`<option ${a===sku.variant_axis_2?'selected':''}>${a}</option>`).join('')}
+      </select>`;
+  }else if(group.length>1){
+    variantControlHtml=`<label class="lbl">Variant</label>
+      <select class="inp" id="detail-variant" onchange="detailVariantChange(this.selectedIndex)">
+        ${group.map((v,i)=>`<option ${i===variantIdx?'selected':''}>${v.variant||v.sku_code}</option>`).join('')}
+      </select>`;
+  }
 
   $('detail-view').innerHTML=`
     <button class="back-link" onclick="showGrid(true)">← Back to Shop</button>
@@ -419,10 +500,7 @@ function renderDetail(group,variantIdx){
           <span class="detail-price" id="detailprice">${price!=null?P(price):'—'}</span>
           ${sku.is_on_sale&&sku.sale_price!=null?`<span class="detail-strike" id="detailstrike">${P(sku.retail_price_direct)}</span>`:''}
         </div>
-        ${group.length>1?`<label class="lbl">Variant</label>
-          <select class="inp" id="detail-variant" onchange="detailVariantChange(this.selectedIndex)">
-            ${group.map((v,i)=>`<option ${i===variantIdx?'selected':''}>${v.variant||v.sku_code}</option>`).join('')}
-          </select>`:''}
+        ${variantControlHtml}
         <label class="lbl">Quantity</label>
         <div class="qty-row">
           <button class="qty-btn" onclick="changeQty(-1)">−</button>
@@ -434,10 +512,10 @@ function renderDetail(group,variantIdx){
           <button class="btn btn-p" id="detail-add" ${out?'disabled':''} onclick="detailAddToCart()">Add to Tote Bag</button>
           <button class="btn btn-g" id="detail-buy" ${out?'disabled':''} onclick="detailBuyNow()">Buy Now</button>
         </div>
-        ${sku.description?`<p class="detail-desc">${sku.description}</p>`:''}
+        ${l.long_description?`<p class="detail-desc">${l.long_description}</p>`:''}
         ${subs.map((s,i)=>`<div class="subdesc">
-          <div class="subdesc-hdr" onclick="toggleSub(${i})">${s.title} <span id="subarrow-${i}">▼</span></div>
-          <div class="subdesc-body" id="subbody-${i}">${s.body}</div>
+          <div class="subdesc-hdr" onclick="toggleSub(${i})">${s.title||''} <span id="subarrow-${i}">▼</span></div>
+          <div class="subdesc-body" id="subbody-${i}">${s.body||''}</div>
         </div>`).join('')}
       </div>
     </div>`;
@@ -458,6 +536,20 @@ function changeQty(delta){
   $('detail-qty').textContent=detailQty;
 }
 function detailVariantChange(idx){
+  showDetail(S.currentGroupIdx,idx,true);
+}
+function detailAxis1Change(axis1){
+  const group=filteredGroups()[S.currentGroupIdx]||S.groups[S.currentGroupIdx];
+  const a2opts=axis2Options(group,axis1);
+  const sku=findByAxes(group,axis1,a2opts[0]);
+  const idx=group.indexOf(sku);
+  showDetail(S.currentGroupIdx,idx,true);
+}
+function detailAxis2Change(axis2){
+  const group=filteredGroups()[S.currentGroupIdx]||S.groups[S.currentGroupIdx];
+  const axis1=$('detail-axis1').value;
+  const sku=findByAxes(group,axis1,axis2);
+  const idx=group.indexOf(sku);
   showDetail(S.currentGroupIdx,idx,true);
 }
 function toggleDetailLike(skuId){
