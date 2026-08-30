@@ -58,7 +58,7 @@ a{color:inherit}
 
 .pcard-body{padding:.8rem .9rem 1rem;display:flex;flex-direction:column;gap:5px;flex:1}
 .pcard-name{font-size:13px;font-weight:600;color:var(--text-dark);line-height:1.3}
-.pcard-desc{font-size:11px;color:var(--text-muted);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pcard-desc{font-size:11px;color:var(--text-muted);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-line}
 .pcard-variant{width:100%;padding:6px 8px;border:1px solid var(--sand);border-radius:7px;font-size:11px;background:white;margin-top:2px}
 .pcard-price-row{display:flex;align-items:baseline;gap:6px;margin-top:2px}
 .pcard-price{font-family:'Cormorant Garamond',serif;font-size:1.15rem;font-weight:600;color:var(--lagoon)}
@@ -98,10 +98,10 @@ a{color:inherit}
 .btn-g{background:var(--golden);color:white}
 .btn-o{background:transparent;color:var(--lagoon);border:1.5px solid var(--lagoon);flex:0 0 46px}
 .btn-o.liked{background:var(--danger-bg);border-color:var(--danger-border);color:var(--danger)}
-.detail-desc{font-size:14px;color:var(--text-mid);line-height:1.7;margin-bottom:1.5rem}
-.subdesc{border-top:1px solid var(--sand);padding:14px 0}
-.subdesc-hdr{display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-dark);text-transform:uppercase;letter-spacing:.04em}
-.subdesc-body{font-size:13px;color:var(--text-mid);line-height:1.7;margin-top:10px;display:none}
+.detail-desc{font-size:14px;color:var(--text-mid);line-height:1.7;margin-bottom:1.5rem;white-space:pre-line}
+.subdesc{border-top:1px solid var(--sand);padding:14px 0;cursor:pointer}
+.subdesc-hdr{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;color:var(--text-dark);text-transform:uppercase;letter-spacing:.04em}
+.subdesc-body{font-size:13px;color:var(--text-mid);line-height:1.7;margin-top:10px;display:none;white-space:pre-line;cursor:default}
 .subdesc-body.open{display:block}
 
 /* CART DRAWER */
@@ -513,8 +513,8 @@ function renderDetail(group,variantIdx){
           <button class="btn btn-g" id="detail-buy" ${out?'disabled':''} onclick="detailBuyNow()">Buy Now</button>
         </div>
         ${l.long_description?`<p class="detail-desc">${l.long_description}</p>`:''}
-        ${subs.map((s,i)=>`<div class="subdesc">
-          <div class="subdesc-hdr" onclick="toggleSub(${i})">${s.title||''} <span id="subarrow-${i}">▼</span></div>
+        ${subs.map((s,i)=>`<div class="subdesc" onclick="toggleSub(${i})">
+          <div class="subdesc-hdr">${s.title||''} <span id="subarrow-${i}">▼</span></div>
           <div class="subdesc-body" id="subbody-${i}">${s.body||''}</div>
         </div>`).join('')}
       </div>
