@@ -25,7 +25,7 @@ a{color:inherit}
 
 /* HEADER */
 .hdr{position:sticky;top:0;z-index:90;background:var(--pearl);border-bottom:1px solid var(--sand);padding:1rem 1.25rem}
-.hdr-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between}
+.hdr-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
 .hdr h1{font-size:1.15rem;color:var(--lagoon)}
 .hdr-sub{font-size:10px;letter-spacing:.1em;color:var(--text-muted);text-transform:uppercase;margin-top:1px}
 .hdr-actions{display:flex;align-items:center;gap:10px}
@@ -150,7 +150,13 @@ a{color:inherit}
 
 <div class="hdr">
   <div class="hdr-inner">
-    <div><h1>Mike Charlie Co.</h1><div class="hdr-sub">Good Things for Everyday<br>Filipino-Made Soaps and Goods</div></div>
+    <div style="display:flex;align-items:center;gap:1.8rem;flex-wrap:wrap">
+      <img src="https://static.wixstatic.com/media/d7782b_c8da6516ec35423b930841d288841df0~mv2.png" alt="Mike Charlie Co." style="height:38px;width:auto;object-fit:contain">
+      <div style="display:flex;gap:1.4rem;font-size:13px">
+        <a href="/" style="color:var(--lagoon);font-weight:600">Shop</a>
+        <a href="/hotel-partner-program" style="color:var(--text-mid);font-weight:500">Hotel Partner Program</a>
+      </div>
+    </div>
     <div class="hdr-actions">
       <button class="auth-link" id="auth-link" onclick="openAuthModal()">Log In / Sign Up</button>
       <button class="hdr-btn" onclick="openCart()">🛍️<span class="cart-badge" id="cart-badge" style="display:none">0</span></button>
@@ -197,6 +203,21 @@ a{color:inherit}
     </div>
   </div>
 </div>
+
+<footer style="background:var(--text-dark);color:rgba(247,243,236,.65);padding:2.5rem 1.5rem;margin-top:2rem">
+  <div style="max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:1.2rem;text-align:center">
+    <div>
+      <div style="font-family:'Cormorant Garamond',serif;font-size:1.1rem;color:white">Mike Charlie Co.</div>
+      <div style="font-size:12.5px;margin-top:2px">Good Things for Everyday · Filipino-Made Soaps and Goods</div>
+    </div>
+    <div style="display:flex;gap:1.2rem;justify-content:center;font-size:12.5px">
+      <a href="/" style="color:inherit">Shop</a>
+      <a href="https://www.instagram.com/mikecharlieco/" target="_blank" style="color:inherit">Instagram</a>
+      <a href="https://www.threads.com/mikecharlieco/" target="_blank" style="color:inherit">Threads</a>
+      <a href="https://m.me/mikecharlieco" target="_blank" style="color:inherit">Facebook</a>
+    </div>
+  </div>
+</footer>
 
 <script>
 /* ─── SUPABASE ─── */
