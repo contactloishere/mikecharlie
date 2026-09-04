@@ -278,32 +278,11 @@ footer{background:var(--ink);color:rgba(247,243,236,.65);padding:2.5rem 1.5rem}
   .hero p{margin:0 auto}
 }
 </style>
+<link rel="stylesheet" href="/partials/shared.css">
 </head>
 <body>
 
-<div class="hdr">
-  <div class="hdr-inner">
-    <div style="display:flex;align-items:center;gap:1.8rem;flex-wrap:wrap">
-      <img src="https://static.wixstatic.com/media/d7782b_c8da6516ec35423b930841d288841df0~mv2.png" alt="Mike Charlie Co." style="height:38px;width:auto;object-fit:contain">
-      <div class="hdr-nav-links">
-        <a href="/" style="color:var(--text-mid);font-weight:500">Shop</a>
-        <a href="#" style="color:var(--lagoon);font-weight:600">Hotel Partner Program</a>
-      </div>
-    </div>
-    <div class="hdr-actions">
-      <button class="auth-link" id="auth-link" onclick="openAuthModal()">Log In / Sign Up</button>
-      <button class="hdr-btn" onclick="openCart()">🛍️<span class="cart-badge" id="cart-badge" style="display:none">0</span></button>
-      <button class="hamburger-btn" onclick="openMobileNav()">☰</button>
-    </div>
-  </div>
-</div>
-
-<div class="mobile-nav-overlay" id="mobile-nav-overlay">
-  <button class="mobile-nav-close" onclick="closeMobileNav()">✕</button>
-  <a href="/">Shop</a>
-  <a href="#" onclick="closeMobileNav()">Hotel Partner Program</a>
-  <button class="mnav-item" onclick="closeMobileNav();openAuthModal()">Log In / Sign Up</button>
-</div>
+<div id="site-header"></div>
 
 <!-- HERO -->
 <section class="hero">
@@ -425,7 +404,7 @@ footer{background:var(--ink);color:rgba(247,243,236,.65);padding:2.5rem 1.5rem}
     <div class="benefit-card"><div class="benefit-photo" id="ph-cruelty"><img src="https://static.wixstatic.com/media/d7782b_00255073a4d44fd5a93035f04fdd347d~mv2.png/v1/crop/x_0,y_238,w_2268,h_2127/fill/w_498,h_468,fp_0.50_0.50,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/IMG_9279.png"></div><div class="benefit-card-body"><h4>Cruelty-Free</h4><p>We never test on animals.</p></div></div>
     <div class="benefit-card"><div class="benefit-photo" id="ph-packaging"><img src="https://static.wixstatic.com/media/d7782b_0a731aa40c1146e284b13aa635e797a8~mv2.jpeg/v1/crop/x_0,y_832,w_3024,h_2836/fill/w_498,h_468,fp_0.50_0.50,q_80,usm_0.66_1.00_0.01,enc_avif,quality_auto/IMG_5233.jpeg"></div><div class="benefit-card-body"><h4>Thoughtful Packaging</h4><p>Each bar is wrapped in biodegradable, food-grade and cosmetic-grade paper to reduce plastic waste.</p></div></div>
     <div class="benefit-card"><div class="benefit-photo" id="ph-local"><img src="https://static.wixstatic.com/media/d7782b_09c2bee8cec4423aa2d14a907f987aaf~mv2.png/v1/crop/x_0,y_495,w_973,h_913/fill/w_498,h_468,fp_0.50_0.50,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/Screenshot%202026-04-30%20at%2011_04_34%E2%80%AFAM.png"></div><div class="benefit-card-body"><h4>Locally Crafted</h4><p>Every bar is handmade and packaged in the Philippines, by fellow Filipinos.</p></div></div>
-    <div class="benefit-card"><div class="benefit-photo" id="ph-branding"><img src="https://static.wixstatic.com/media/d7782b_d439192a92d746b490e5d3009049f58b~mv2.jpeg" style="object-position:center 30%"></div><div class="benefit-card-body"><h4>Custom Branding</h4><p>Each order can be wrapped with your own hotel branding, a seamless extension of your guest experience.</p></div></div>
+    <div class="benefit-card"><div class="benefit-photo" id="ph-branding"><img src="https://static.wixstatic.com/media/d7782b_3e6a8470423043e5a908e2aadbb62b2d~mv2.jpg" style="object-position:center 30%"></div><div class="benefit-card-body"><h4>Custom Branding</h4><p>Each order can be wrapped with your own hotel branding, a seamless extension of your guest experience.</p></div></div>
   </div>
 </section>
 
@@ -522,25 +501,7 @@ footer{background:var(--ink);color:rgba(247,243,236,.65);padding:2.5rem 1.5rem}
   </div>
 </section>
 
-<footer>
-  <div class="foot-inner">
-    <div>
-      <div>© Mike Charlie Co 2026. All Rights Reserved.</div>
-      <div>Good Things for Everyday.</div>
-      <div>Filipino-Made Soaps and Goods.</div>
-    </div>
-    <div class="foot-links">
-      <a href="/">Shop</a>
-      <a href="https://www.instagram.com/mikecharlieco/" target="_blank">Instagram</a>
-      <a href="https://www.threads.com/mikecharlieco/" target="_blank">Threads</a>
-      <a href="https://m.me/mikecharlieco" target="_blank">Facebook</a>
-    </div>
-    <div class="foot-links">
-      <a href="/">Shop</a>
-      <a href="/hotel-partner-program">Hotel Partner Program</a>
-    </div>
-  </div>
-</footer>
+<div id="site-footer"></div>
 
 <div class="cart-overlay" id="cart-overlay" onclick="closeCart()"></div>
 <div class="cart-drawer" id="cart-drawer">
@@ -574,11 +535,12 @@ footer{background:var(--ink);color:rgba(247,243,236,.65);padding:2.5rem 1.5rem}
 
 <div class="mobile-sticky-cta"><button class="btn btn-p" onclick="scrollToForm()">Become a Hotel Partner</button></div>
 
+<script src="/partials/shared.js"></script>
 <script>
 const SB_URL='https://cdczxunygdmswgdzkbed.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkY3p4dW55Z2Rtc3dnZHprYmVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxOTg5NjksImV4cCI6MjEwMjc3NDk2OX0.IrC05NPev5Zp6uV0DMe0gZI3boQsqXuTYSTVdyn8oWg';
+loadSharedParts();
 function scrollToForm(){document.getElementById('inquiry-form').scrollIntoView({behavior:'smooth'});}
-function openMobileNav(){document.getElementById('mobile-nav-overlay').classList.add('show');}
 function closeMobileNav(){document.getElementById('mobile-nav-overlay').classList.remove('show');}
 
 /* ─── CART (shared localStorage with Shop page) ─── */
