@@ -1,0 +1,41 @@
+<div class="hdr">
+  <div class="hdr-inner">
+    <div style="display:flex;align-items:center;gap:1.8rem;flex-wrap:wrap">
+      <a href="/"><img src="https://static.wixstatic.com/media/d7782b_c8da6516ec35423b930841d288841df0~mv2.png" alt="Mike Charlie Co." style="height:38px;width:auto;object-fit:contain"></a>
+      <div class="hdr-nav-links">
+        <a href="/" data-nav="shop">Shop</a>
+        <a href="/hotel-partner-program" data-nav="hotel-partner-program">Hotel Partner Program</a>
+      </div>
+    </div>
+    <div class="hdr-actions">
+      <button class="auth-link" id="auth-link" onclick="openAuthModal()">Log In / Sign Up</button>
+      <button class="hdr-btn" onclick="openCart()">🛍️<span class="cart-badge" id="cart-badge" style="display:none">0</span></button>
+      <button class="hamburger-btn" onclick="openMobileNav()">☰</button>
+    </div>
+  </div>
+</div>
+
+<div class="mobile-nav-overlay" id="mobile-nav-overlay">
+  <button class="mobile-nav-close" onclick="closeMobileNav()">✕</button>
+  <a href="/">Shop</a>
+  <a href="/hotel-partner-program">Hotel Partner Program</a>
+  <button class="mnav-item" onclick="closeMobileNav();openAuthModal()">Log In / Sign Up</button>
+</div>
+
+<script>
+// Highlight the current page's nav link once the header is injected
+(function(){
+  const path = window.location.pathname.replace(/\/$/, '') || '/';
+  document.querySelectorAll('.hdr-nav-links a').forEach(a=>{
+    const isShop = a.dataset.nav === 'shop' && (path === '' || path === '/');
+    const isHotel = a.dataset.nav === 'hotel-partner-program' && path.includes('hotel-partner-program');
+    if (isShop || isHotel) {
+      a.style.color = 'var(--lagoon)';
+      a.style.fontWeight = '600';
+    } else {
+      a.style.color = 'var(--text-mid)';
+      a.style.fontWeight = '500';
+    }
+  });
+})();
+</script>
