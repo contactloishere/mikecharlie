@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mike Charlie Co. — Shop</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -29,6 +30,17 @@ a{color:inherit}
 .hdr h1{font-size:1.15rem;color:var(--lagoon)}
 .hdr-sub{font-size:10px;letter-spacing:.1em;color:var(--text-muted);text-transform:uppercase;margin-top:1px}
 .hdr-actions{display:flex;align-items:center;gap:10px}
+.hdr-nav-links{display:flex;gap:1.4rem;font-size:13px}
+.hamburger-btn{display:none;background:none;border:none;font-size:22px;color:var(--lagoon);cursor:pointer;padding:4px}
+@media(max-width:759px){
+  .hdr-nav-links{display:none}
+  #auth-link{display:none}
+  .hamburger-btn{display:block}
+}
+.mobile-nav-overlay{position:fixed;inset:0;background:var(--lagoon);z-index:300;display:none;flex-direction:column;align-items:center;justify-content:center;gap:1.6rem}
+.mobile-nav-overlay.show{display:flex}
+.mobile-nav-overlay a,.mobile-nav-overlay button.mnav-item{color:white;font-size:1.3rem;font-weight:600;background:none;border:none;cursor:pointer}
+.mobile-nav-close{position:absolute;top:20px;right:20px;font-size:30px;color:white;background:none;border:none;cursor:pointer;line-height:1}
 .hdr-btn{background:none;border:none;font-size:20px;color:var(--lagoon);position:relative;padding:4px}
 .cart-badge{position:absolute;top:-2px;right:-2px;background:var(--danger);color:white;font-size:10px;font-weight:700;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center}
 .auth-link{background:var(--lagoon);color:var(--pearl);border:none;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:500}
@@ -145,24 +157,11 @@ a{color:inherit}
 .auth-ok p{font-size:13px;color:var(--text-mid);line-height:1.5}
 .t-muted{color:var(--text-muted)}
 </style>
+<link rel="stylesheet" href="/partials/shared.css">
 </head>
 <body>
 
-<div class="hdr">
-  <div class="hdr-inner">
-    <div style="display:flex;align-items:center;gap:1.8rem;flex-wrap:wrap">
-      <img src="https://static.wixstatic.com/media/d7782b_c8da6516ec35423b930841d288841df0~mv2.png" alt="Mike Charlie Co." style="height:38px;width:auto;object-fit:contain">
-      <div style="display:flex;gap:1.4rem;font-size:13px">
-        <a href="/" style="color:var(--lagoon);font-weight:600">Shop</a>
-        <a href="/hotel-partner-program" style="color:var(--text-mid);font-weight:500">Hotel Partner Program</a>
-      </div>
-    </div>
-    <div class="hdr-actions">
-      <button class="auth-link" id="auth-link" onclick="openAuthModal()">Log In / Sign Up</button>
-      <button class="hdr-btn" onclick="openCart()">🛍️<span class="cart-badge" id="cart-badge" style="display:none">0</span></button>
-    </div>
-  </div>
-</div>
+<div id="site-header"></div>
 
 <div class="cat-bar" id="cat-bar"></div>
 
@@ -204,25 +203,14 @@ a{color:inherit}
   </div>
 </div>
 
-<footer style="background:var(--text-dark);color:rgba(247,243,236,.65);padding:2.5rem 1.5rem;margin-top:2rem">
-  <div style="max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:1.2rem;text-align:center">
-    <div>
-      <div style="font-family:'Cormorant Garamond',serif;font-size:1.1rem;color:white">Mike Charlie Co.</div>
-      <div style="font-size:12.5px;margin-top:2px">Good Things for Everyday · Filipino-Made Soaps and Goods</div>
-    </div>
-    <div style="display:flex;gap:1.2rem;justify-content:center;font-size:12.5px">
-      <a href="/" style="color:inherit">Shop</a>
-      <a href="https://www.instagram.com/mikecharlieco/" target="_blank" style="color:inherit">Instagram</a>
-      <a href="https://www.threads.com/mikecharlieco/" target="_blank" style="color:inherit">Threads</a>
-      <a href="https://m.me/mikecharlieco" target="_blank" style="color:inherit">Facebook</a>
-    </div>
-  </div>
-</footer>
+<div id="site-footer"></div>
 
+<script src="/partials/shared.js"></script>
 <script>
 /* ─── SUPABASE ─── */
 const SB_URL='https://cdczxunygdmswgdzkbed.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkY3p4dW55Z2Rtc3dnZHprYmVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxOTg5NjksImV4cCI6MjEwMjc3NDk2OX0.IrC05NPev5Zp6uV0DMe0gZI3boQsqXuTYSTVdyn8oWg';
+loadSharedParts();
 async function sbGet(table,query){
   const r=await fetch(`${SB_URL}/rest/v1/${table}?${query}`,{headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}});
   if(!r.ok)throw new Error('Load failed');
@@ -662,6 +650,8 @@ function saveSession(data){
 function loadSession(){try{const raw=localStorage.getItem(SESSION_KEY);return raw?JSON.parse(raw):null;}catch(e){return null;}}
 function clearSession(){localStorage.removeItem(SESSION_KEY);}
 function openAuthModal(){$('auth-modal').classList.add('show');}
+function openMobileNav(){document.getElementById('mobile-nav-overlay').classList.add('show');}
+function closeMobileNav(){document.getElementById('mobile-nav-overlay').classList.remove('show');}
 function closeAuthModal(){$('auth-modal').classList.remove('show');}
 function signInFormHtml(){
   return `<h2>Welcome</h2><div class="auth-tabs"><button class="auth-tab on" onclick="setAuthMode('signin')">Log In</button><button class="auth-tab" onclick="setAuthMode('signup')">Sign Up</button></div>
