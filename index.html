@@ -2,9 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mike Charlie Co. — Shop</title>
+<title>Mike Charlie Co. — Coming Soon</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -21,166 +20,73 @@
 body{font-family:'DM Sans',sans-serif;background:var(--pearl);color:var(--text-dark);min-height:100vh}
 h1,h2,h3{font-family:'Cormorant Garamond',serif}
 button{font-family:'DM Sans',sans-serif;cursor:pointer}
-a{color:inherit}
-@keyframes spin{to{transform:rotate(360deg)}}
 
-/* HEADER */
-.hdr{position:sticky;top:0;z-index:90;background:var(--pearl);border-bottom:1px solid var(--sand);padding:1rem 1.25rem}
-.hdr-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:1.25rem 1.5rem;max-width:1100px;margin:0 auto}
 .hdr h1{font-size:1.15rem;color:var(--lagoon)}
-.hdr-sub{font-size:10px;letter-spacing:.1em;color:var(--text-muted);text-transform:uppercase;margin-top:1px}
-.hdr-actions{display:flex;align-items:center;gap:10px}
-.hdr-nav-links{display:flex;gap:1.4rem;font-size:13px}
-.hamburger-btn{display:none;background:none;border:none;font-size:22px;color:var(--lagoon);cursor:pointer;padding:4px}
-@media(max-width:759px){
-  .hdr-nav-links{display:none}
-  #auth-link{display:none}
-  .hamburger-btn{display:block}
-}
-.mobile-nav-overlay{position:fixed;inset:0;background:var(--lagoon);z-index:300;display:none;flex-direction:column;align-items:center;justify-content:center;gap:1.6rem}
-.mobile-nav-overlay.show{display:flex}
-.mobile-nav-overlay a,.mobile-nav-overlay button.mnav-item{color:white;font-size:1.3rem;font-weight:600;background:none;border:none;cursor:pointer}
-.mobile-nav-close{position:absolute;top:20px;right:20px;font-size:30px;color:white;background:none;border:none;cursor:pointer;line-height:1}
-.hdr-btn{background:none;border:none;font-size:20px;color:var(--lagoon);position:relative;padding:4px}
-.cart-badge{position:absolute;top:-2px;right:-2px;background:var(--danger);color:white;font-size:10px;font-weight:700;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center}
-.auth-link{background:var(--lagoon);color:var(--pearl);border:none;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:500}
+.hdr-sub{font-size:10px;letter-spacing:.12em;color:var(--text-muted);text-transform:uppercase;margin-top:1px}
+.auth-link{background:var(--lagoon);color:var(--pearl);border:none;border-radius:9px;padding:9px 18px;font-size:13px;font-weight:500}
 
-/* CATEGORY BAR */
-.cat-bar{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;padding:1rem 1.25rem;max-width:1200px;margin:0 auto}
-.cat-chip{background:white;border:1.5px solid var(--sand);border-radius:20px;padding:7px 16px;font-size:12px;font-weight:500;color:var(--text-mid);white-space:nowrap}
-.cat-chip.on{background:var(--lagoon);border-color:var(--lagoon);color:white}
+.hero{max-width:600px;margin:6vh auto 0;text-align:center;padding:0 1.5rem}
+.hero h2{font-size:2.4rem;color:var(--lagoon);margin-bottom:10px;line-height:1.15}
+.hero p{font-size:15px;color:var(--text-mid);line-height:1.6;margin-bottom:2rem}
+.leaf{font-size:38px;margin-bottom:1rem}
 
-/* GRID */
-#grid-view{max-width:1200px;margin:0 auto;padding:0 1.25rem 3rem}
-.pgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
-@media(min-width:760px){.pgrid{grid-template-columns:repeat(3,1fr)}}
+.contact-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:420px;margin:0 auto;padding:0 1.5rem}
+.contact-btn{display:flex;flex-direction:column;align-items:center;background:white;border:1px solid var(--sand);border-radius:10px;padding:12px 6px;text-decoration:none;gap:4px;box-shadow:var(--shadow)}
+.contact-btn span:first-child{font-size:20px}
+.contact-btn span:last-child{font-size:11px;font-weight:600;color:var(--text-dark)}
+.contact-lbl{text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin:2.5rem 0 .75rem}
 
-.pcard{background:white;border:1px solid var(--sand);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);display:flex;flex-direction:column;cursor:pointer}
-.pcard-gallery{position:relative;aspect-ratio:1/1;background:var(--sand-light)}
-.pcard-scroll{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;height:100%;scrollbar-width:none}
-.pcard-scroll::-webkit-scrollbar{display:none}
-.pcard-scroll img{width:100%;height:100%;object-fit:cover;flex-shrink:0;scroll-snap-align:start}
-.pcard-ph{width:100%;height:100%;flex-shrink:0;scroll-snap-align:start;display:flex;align-items:center;justify-content:center;font-size:34px;color:var(--teal-light);background:var(--sand-light)}
-.pcard-dots{position:absolute;bottom:8px;left:0;right:0;display:flex;justify-content:center;gap:4px;z-index:2}
-.pdot{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.6);border:none;padding:0;cursor:pointer}
-.pdot.on{background:white;width:6px;height:6px}
-.pribbon{position:absolute;top:8px;left:8px;background:var(--golden);color:white;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;z-index:2;letter-spacing:.02em}
-.plow{position:absolute;top:8px;right:8px;background:var(--danger);color:white;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;z-index:2}
-.plike{position:absolute;bottom:8px;right:8px;background:rgba(255,255,255,.9);border:none;border-radius:50%;width:28px;height:28px;font-size:14px;z-index:2;display:flex;align-items:center;justify-content:center}
-
-.pcard-body{padding:.8rem .9rem 1rem;display:flex;flex-direction:column;gap:5px;flex:1}
-.pcard-name{font-size:13px;font-weight:600;color:var(--text-dark);line-height:1.3}
-.pcard-desc{font-size:11px;color:var(--text-muted);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-line}
-.pcard-variant{width:100%;padding:6px 8px;border:1px solid var(--sand);border-radius:7px;font-size:11px;background:white;margin-top:2px}
-.pcard-price-row{display:flex;align-items:baseline;gap:6px;margin-top:2px}
-.pcard-price{font-family:'Cormorant Garamond',serif;font-size:1.15rem;font-weight:600;color:var(--lagoon)}
-.pcard-strike{font-size:11px;color:var(--text-muted);text-decoration:line-through}
-.pcard-add{margin-top:auto;background:var(--lagoon);color:var(--pearl);border:none;border-radius:8px;padding:8px;font-size:12px;font-weight:500}
-.pcard-add:disabled{background:var(--sand);color:var(--text-muted)}
-
-.load-sentinel{height:40px;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:12px}
-.empty{text-align:center;padding:4rem 1rem;color:var(--text-muted)}
-
-/* DETAIL VIEW */
-#detail-view{display:none;max-width:1000px;margin:0 auto;padding:1.5rem 1.25rem 4rem}
-.back-link{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text-mid);background:none;border:none;margin-bottom:1rem}
-.detail-grid{display:grid;grid-template-columns:1fr;gap:1.5rem}
-@media(min-width:760px){.detail-grid{grid-template-columns:1fr 1fr;gap:2.5rem}}
-.detail-gallery{position:relative;aspect-ratio:1/1;background:var(--sand-light);border-radius:16px;overflow:hidden}
-.detail-scroll{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;height:100%;scrollbar-width:none}
-.detail-scroll::-webkit-scrollbar{display:none}
-.detail-scroll img{width:100%;height:100%;object-fit:cover;flex-shrink:0;scroll-snap-align:start}
-.detail-ph{width:100%;height:100%;flex-shrink:0;scroll-snap-align:start;display:flex;align-items:center;justify-content:center;font-size:60px;color:var(--teal-light)}
-.detail-dots{position:absolute;bottom:14px;left:0;right:0;display:flex;justify-content:center;gap:6px}
-.ddot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.6);border:none;padding:0;cursor:pointer}
-.ddot.on{background:white;width:8px;height:8px}
-
-.detail-name{font-size:1.7rem;color:var(--lagoon);margin-bottom:6px}
-.detail-price-row{display:flex;align-items:baseline;gap:10px;margin-bottom:1rem}
-.detail-price{font-family:'Cormorant Garamond',serif;font-size:1.7rem;font-weight:600;color:var(--lagoon)}
-.detail-strike{font-size:14px;color:var(--text-muted);text-decoration:line-through}
-.lbl{display:block;font-size:13px;color:var(--text-mid);margin-bottom:5px;font-weight:500}
-.inp{width:100%;padding:11px 12px;border:1.5px solid var(--sand);border-radius:9px;font-size:14px;margin-bottom:14px}
-.qty-row{display:flex;align-items:center;gap:12px;margin-bottom:16px}
-.qty-btn{width:36px;height:36px;border-radius:8px;border:1.5px solid var(--sand);background:white;font-size:16px}
-.qty-val{font-size:16px;font-weight:600;min-width:24px;text-align:center}
-.detail-btns{display:flex;gap:8px;margin-bottom:1.25rem}
-.btn{padding:13px;border-radius:9px;font-size:14px;font-weight:500;border:none;text-align:center;flex:1}
-.btn-p{background:var(--lagoon);color:var(--pearl)}
-.btn-g{background:var(--golden);color:white}
-.btn-o{background:transparent;color:var(--lagoon);border:1.5px solid var(--lagoon);flex:0 0 46px}
-.btn-o.liked{background:var(--danger-bg);border-color:var(--danger-border);color:var(--danger)}
-.detail-desc{font-size:14px;color:var(--text-mid);line-height:1.7;margin-bottom:1.5rem;white-space:pre-line}
-.subdesc{border-top:1px solid var(--sand);padding:14px 0;cursor:pointer}
-.subdesc-hdr{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;color:var(--text-dark);text-transform:uppercase;letter-spacing:.04em}
-.subdesc-body{font-size:13px;color:var(--text-mid);line-height:1.7;margin-top:10px;display:none;white-space:pre-line;cursor:default}
-.subdesc-body.open{display:block}
-
-/* CART DRAWER */
-.cart-overlay{position:fixed;inset:0;background:rgba(28,46,44,.5);z-index:150;display:none}
-.cart-overlay.show{display:block}
-.cart-drawer{position:fixed;top:0;right:0;bottom:0;width:100%;max-width:420px;background:white;z-index:151;transform:translateX(100%);transition:transform .25s;display:flex;flex-direction:column;box-shadow:var(--shadow-lg)}
-.cart-drawer.show{transform:translateX(0)}
-.cart-hdr{padding:1.25rem;border-bottom:1px solid var(--sand);display:flex;justify-content:space-between;align-items:center}
-.cart-hdr h2{font-size:1.3rem;color:var(--lagoon)}
-.cart-close{background:var(--sand);border:none;border-radius:50%;width:32px;height:32px;font-size:16px}
-.cart-items{flex:1;overflow-y:auto;padding:1rem 1.25rem}
-.cart-item{display:flex;gap:10px;padding:12px 0;border-bottom:1px solid var(--sand-light)}
-.cart-item-img{width:56px;height:56px;border-radius:8px;background:var(--sand-light);flex-shrink:0;object-fit:cover;display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--teal-light)}
-.cart-item-info{flex:1}
-.cart-item-name{font-size:13px;font-weight:500}
-.cart-item-var{font-size:11px;color:var(--text-muted)}
-.cart-item-row{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
-.cart-item-qty{display:flex;align-items:center;gap:6px}
-.cart-qbtn{width:24px;height:24px;border-radius:6px;border:1px solid var(--sand);background:white;font-size:12px}
-.cart-item-price{font-size:13px;font-weight:600;color:var(--lagoon)}
-.cart-remove{background:none;border:none;color:var(--danger);font-size:11px;margin-top:4px}
-.cart-footer{padding:1.25rem;border-top:1px solid var(--sand)}
-.cart-total-row{display:flex;justify-content:space-between;margin-bottom:12px}
-.cart-total-lbl{font-size:14px;color:var(--text-mid)}
-.cart-total-amt{font-family:'Cormorant Garamond',serif;font-size:1.4rem;color:var(--lagoon);font-weight:600}
-
-.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--lagoon);color:white;padding:12px 20px;border-radius:9px;font-size:14px;z-index:400;white-space:nowrap;box-shadow:var(--shadow-lg);display:none;max-width:92vw;text-align:center}
-
-/* AUTH MODAL (reused pattern) */
+/* MODAL */
 .modal{position:fixed;inset:0;background:rgba(28,46,44,.65);z-index:200;display:none;align-items:center;justify-content:center;padding:1rem}
 .modal.show{display:flex}
-.modal-box{background:white;border-radius:16px;padding:2rem 1.75rem;width:100%;max-width:380px;box-shadow:var(--shadow-lg);position:relative;max-height:90vh;overflow-y:auto}
+.modal-box{background:white;border-radius:16px;padding:2rem 1.75rem;width:100%;max-width:380px;box-shadow:var(--shadow-lg);position:relative}
 .modal-close{position:absolute;top:12px;right:14px;background:var(--sand);border:none;border-radius:50%;width:30px;height:30px;font-size:16px;display:flex;align-items:center;justify-content:center;color:var(--text-mid)}
 .modal-box h2{font-size:1.5rem;color:var(--lagoon);text-align:center;margin-bottom:1.25rem}
 .auth-tabs{display:flex;background:var(--pearl);border-radius:9px;padding:3px;margin-bottom:1.25rem}
 .auth-tab{flex:1;padding:8px;border:none;background:none;border-radius:7px;font-size:13px;font-weight:500;color:var(--text-muted)}
 .auth-tab.on{background:white;color:var(--lagoon);box-shadow:var(--shadow)}
+.lbl{display:block;font-size:13px;color:var(--text-mid);margin-bottom:5px;font-weight:500}
+.inp{width:100%;padding:11px 12px;border:1.5px solid var(--sand);border-radius:9px;font-size:14px;margin-bottom:12px;outline:none}
+.inp:focus{border-color:var(--teal)}
+.btn{display:block;width:100%;padding:12px;border-radius:9px;font-size:14px;font-weight:500;border:none;text-align:center}
+.btn-p{background:var(--lagoon);color:var(--pearl)}
 .auth-err{background:var(--danger-bg);border:1px solid var(--danger-border);color:var(--danger);font-size:13px;padding:9px 12px;border-radius:8px;margin-bottom:12px;display:none}
 .auth-ok{background:var(--success-bg);border:1px solid var(--success-border);color:var(--success);text-align:center;padding:1.5rem 1rem;border-radius:9px}
 .auth-ok h3{color:var(--success);margin-bottom:6px}
 .auth-ok p{font-size:13px;color:var(--text-mid);line-height:1.5}
-.t-muted{color:var(--text-muted)}
+.gmail-note{text-align:center;font-size:11px;color:var(--text-muted);margin-top:14px}
+
+/* ROLE SELECTOR */
+.role-grid{display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:16px}
+.role-card{display:flex;align-items:center;gap:12px;border:1.5px solid var(--sand);border-radius:10px;padding:12px 14px;cursor:pointer;background:white;text-align:left}
+.role-card.on{border-color:var(--lagoon);background:var(--pearl)}
+.role-card .ri{font-size:22px}
+.role-card .rt{font-weight:600;font-size:13px;color:var(--text-dark)}
+.role-card .rd{font-size:11px;color:var(--text-muted);margin-top:1px}
 </style>
-<link rel="stylesheet" href="/partials/shared.css">
 </head>
 <body>
 
-<div id="site-header"></div>
-
-<div class="cat-bar" id="cat-bar"></div>
-
-<div id="grid-view">
-  <div class="pgrid" id="pgrid"></div>
-  <div class="load-sentinel" id="sentinel"></div>
+<div class="hdr">
+  <div><h1>Mike Charlie Co.</h1><div class="hdr-sub">Good Things for Everyday<br>Filipino-Made Soaps and Goods</div></div>
+  <button class="auth-link" id="auth-link" onclick="openAuthModal()">Log In / Sign Up</button>
 </div>
 
-<div id="detail-view"></div>
-<div id="toast" class="toast"></div>
+<div class="hero">
+  <div class="leaf">🌿</div>
+  <h2>Something good<br>is on its way.</h2>
+  <p>We're building a new home for zero-waste shampoo bars, body bars, and everyday essentials — made by hand, made to last. In the meantime, reach us directly below, or create an account now so you're ready the moment we launch.</p>
+</div>
 
-<div class="cart-overlay" id="cart-overlay" onclick="closeCart()"></div>
-<div class="cart-drawer" id="cart-drawer">
-  <div class="cart-hdr"><h2>Your Tote Bag</h2><button class="cart-close" onclick="closeCart()">✕</button></div>
-  <div class="cart-items" id="cart-items"></div>
-  <div class="cart-footer">
-    <div class="cart-total-row"><span class="cart-total-lbl">Total</span><span class="cart-total-amt" id="cart-total">₱0.00</span></div>
-    <button class="btn btn-p" style="width:100%" onclick="goCheckout()">Checkout</button>
-  </div>
+<div class="contact-lbl">Reach Us Directly</div>
+<div class="contact-grid">
+  <a class="contact-btn" href="https://wa.me/message/T7LXVS3L74A5C1" target="_blank"><span>💬</span><span>WhatsApp</span></a>
+  <a class="contact-btn" href="viber://add?number=639760467782" target="_blank"><span>📳</span><span>Viber</span></a>
+  <a class="contact-btn" href="imessage://+639760467782" target="_blank"><span>📱</span><span>iMessage</span></a>
+  <a class="contact-btn" href="https://www.instagram.com/mikecharlieco/" target="_blank"><span>📸</span><span>Instagram</span></a>
+  <a class="contact-btn" href="https://m.me/mikecharlieco" target="_blank"><span>👥</span><span>Facebook</span></a>
+  <a class="contact-btn" href="https://www.threads.com/mikecharlieco/" target="_blank"><span>🧵</span><span>Threads</span></a>
 </div>
 
 <!-- AUTH MODAL -->
@@ -198,512 +104,183 @@ a{color:inherit}
       <input class="inp" type="email" id="auth-email" placeholder="you@email.com">
       <label class="lbl">Password</label>
       <input class="inp" type="password" id="auth-pw" placeholder="••••••••">
-      <button class="btn btn-p" style="width:100%" id="auth-submit" onclick="submitAuth()">Log In</button>
+      <button class="btn btn-p" id="auth-submit" onclick="submitAuth()">Log In</button>
+      <p class="gmail-note">Sign in with Google is coming soon — email works for now.</p>
     </div>
   </div>
 </div>
 
-<div id="site-footer"></div>
+<!-- PARTNER LEAD MODAL -->
+<div id="lead-modal" class="modal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeLeadModal()">✕</button>
+    <div id="lead-content">
+      <h2>Partner With Us</h2>
+      <p style="font-size:13px;color:var(--text-mid);text-align:center;margin-bottom:16px">Tell us a bit about your business — we'll reach out personally.</p>
+      <div class="auth-err" id="lead-err"></div>
+      <label class="lbl">Your Name</label>
+      <input class="inp" id="lead-name" placeholder="Your full name">
+      <label class="lbl">Email</label>
+      <input class="inp" type="email" id="lead-email" placeholder="you@email.com">
+      <label class="lbl">Business Name</label>
+      <input class="inp" id="lead-biz" placeholder="e.g. Sunset Cafe">
+      <label class="lbl">Message (optional)</label>
+      <textarea class="inp" id="lead-msg" placeholder="Tell us a bit about your business"></textarea>
+      <button class="btn btn-p" id="lead-submit" onclick="submitLead()">Send Inquiry</button>
+    </div>
+  </div>
+</div>
 
-<script src="/partials/shared.js"></script>
 <script>
-/* ─── SUPABASE ─── */
 const SB_URL='https://cdczxunygdmswgdzkbed.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkY3p4dW55Z2Rtc3dnZHprYmVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxOTg5NjksImV4cCI6MjEwMjc3NDk2OX0.IrC05NPev5Zp6uV0DMe0gZI3boQsqXuTYSTVdyn8oWg';
-loadSharedParts();
-async function sbGet(table,query){
-  const r=await fetch(`${SB_URL}/rest/v1/${table}?${query}`,{headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}});
-  if(!r.ok)throw new Error('Load failed');
-  return r.json();
-}
-
-/* ─── HELPERS ─── */
-const $=id=>document.getElementById(id);
-const P=n=>'₱'+(parseFloat(n)||0).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});
-function toast(msg,ms=3000){const t=$('toast');t.textContent=msg;t.style.display='block';clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',ms);}
-
-/* ─── STATE ─── */
-const S={
-  skus:[], groups:[], categories:[], catFilter:'', displayCount:12,
-  cart:JSON.parse(localStorage.getItem('mcc_cart')||'[]'),
-  likes:new Set(JSON.parse(localStorage.getItem('mcc_likes')||'[]')),
-  currentGroupIdx:null, currentVariantIdx:0
-};
-function saveCart(){localStorage.setItem('mcc_cart',JSON.stringify(S.cart));updateCartBadge();}
-function saveLikes(){localStorage.setItem('mcc_likes',JSON.stringify([...S.likes]));}
-
-/* ─── LOAD DATA ─── */
-async function init(){
-  try{
-    const [skus,cats,listings,variantPhotos]=await Promise.all([
-      sbGet('skus','is_sellable=eq.true&is_active=eq.true&select=*,categories(id,name)&order=product_name.asc'),
-      sbGet('categories','select=*&order=display_order.asc'),
-      sbGet('product_listings','select=*'),
-      sbGet('variant_photos','select=sku_id,photo_url')
-    ]);
-    const listingByTitle={};
-    listings.forEach(l=>listingByTitle[l.title]=l);
-    const photoBySku={};
-    variantPhotos.forEach(p=>{if(p.photo_url)photoBySku[p.sku_id]=p.photo_url;});
-    skus.forEach(s=>{
-      s.listing=listingByTitle[s.product_name]||{};
-      s.variantPhotoUrl=photoBySku[s.id]||null;
-    });
-    S.skus=skus;S.categories=cats;
-    groupProducts();
-    renderCatBar();
-    renderGrid();
-    updateCartBadge();
-    handleRoute();
-  }catch(e){
-    $('pgrid').innerHTML=`<div class="empty" style="grid-column:1/-1">Couldn't load products. Please refresh.</div>`;
-  }
-}
-function groupProducts(){
-  const map={};
-  S.skus.forEach(s=>{
-    const key=s.product_name;
-    if(!map[key])map[key]=[];
-    map[key].push(s);
-  });
-  S.groups=Object.values(map);
-}
-function isTwoAxis(group){
-  return group.every(v=>v.variant_axis_1 && v.variant_axis_2);
-}
-function axis1Options(group){
-  return [...new Set(group.map(v=>v.variant_axis_1))];
-}
-function axis2Options(group,axis1){
-  return [...new Set(group.filter(v=>v.variant_axis_1===axis1).map(v=>v.variant_axis_2))];
-}
-function findByAxes(group,axis1,axis2){
-  return group.find(v=>v.variant_axis_1===axis1 && v.variant_axis_2===axis2);
-}
-
-/* ─── PRICING/IMAGES HELPERS ─── */
-function effectivePrice(sku){return (sku.is_on_sale && sku.sale_price!=null) ? sku.sale_price : sku.retail_price_direct;}
-function galleryFor(sku){
-  const imgs=[];
-  if(sku.variantPhotoUrl)imgs.push(sku.variantPhotoUrl);
-  const l=sku.listing||{};
-  [l.cover_image_url,l.image_1,l.image_2,l.image_3,l.image_4,l.image_5,l.image_6,l.image_7,l.image_8,l.image_9]
-    .forEach(u=>{if(u && !imgs.includes(u))imgs.push(u);});
-  return imgs;
-}
-
-/* ─── CATEGORY BAR ─── */
-function renderCatBar(){
-  $('cat-bar').innerHTML=`
-    <button class="cat-chip ${S.catFilter===''?'on':''}" onclick="setCatFilter('')">All</button>
-    ${S.categories.map(c=>`<button class="cat-chip ${S.catFilter===c.id?'on':''}" onclick="setCatFilter('${c.id}')">${c.name}</button>`).join('')}
-  `;
-}
-function setCatFilter(id){S.catFilter=id;S.displayCount=12;renderCatBar();renderGrid();}
-
-/* ─── GRID ─── */
-function filteredGroups(){
-  if(!S.catFilter)return S.groups;
-  return S.groups.filter(g=>g[0].categories && g[0].categories.id===S.catFilter);
-}
-function renderGrid(){
-  const groups=filteredGroups();
-  if(!groups.length){$('pgrid').innerHTML=`<div class="empty" style="grid-column:1/-1">No products in this category yet.</div>`;return;}
-  const visible=groups.slice(0,S.displayCount);
-  $('pgrid').innerHTML=visible.map((g,gi)=>productCardHtml(g,gi)).join('');
-  visible.forEach((g,gi)=>bindCardEvents(gi));
-  $('sentinel').textContent = S.displayCount<groups.length ? 'Loading more…' : (groups.length?'':'');
-}
-function productCardHtml(group,gi){
-  const sku=group[0]; // default to first variant
-  const imgs=galleryFor(sku);
-  const price=effectivePrice(sku);
-  const low=sku.current_stock<=sku.low_stock_threshold && sku.current_stock>0;
-  const out=sku.current_stock<=0;
-  const twoAxis=isTwoAxis(group);
-  let variantControlHtml='';
-  if(twoAxis){
-    const a1opts=axis1Options(group);
-    const a2opts=axis2Options(group,a1opts[0]);
-    variantControlHtml=`<select class="pcard-variant" onclick="event.stopPropagation()" onchange="cardAxis1Change(${gi},this.value)" id="card-axis1-${gi}">
-        ${a1opts.map(a=>`<option>${a}</option>`).join('')}
-      </select>
-      <select class="pcard-variant" onclick="event.stopPropagation()" onchange="cardAxis2Change(${gi},this.value)" id="card-axis2-${gi}">
-        ${a2opts.map(a=>`<option>${a}</option>`).join('')}
-      </select>`;
-  }else if(group.length>1){
-    variantControlHtml=`<select class="pcard-variant" onclick="event.stopPropagation()" onchange="cardVariantChange(${gi},this.selectedIndex)">
-        ${group.map(v=>`<option>${v.variant||v.sku_code}</option>`).join('')}
-      </select>`;
-  }
-  return `<div class="pcard">
-    <div class="pcard-gallery" data-gi="${gi}">
-      <div class="pcard-scroll" id="cardscroll-${gi}">
-        ${imgs.length?imgs.map(u=>`<img src="${u}" loading="lazy">`).join(''):`<div class="pcard-ph">🌿</div>`}
-      </div>
-      ${imgs.length>1?`<div class="pcard-dots">${imgs.map((_,i)=>`<button class="pdot ${i===0?'on':''}" onclick="event.stopPropagation();scrollCard(${gi},${i})"></button>`).join('')}</div>`:''}
-      ${sku.ribbon_text?`<div class="pribbon">${sku.ribbon_text}</div>`:''}
-      ${low?`<div class="plow">Last ${sku.current_stock} left</div>`:out?`<div class="plow" style="background:var(--text-muted)">Out of Stock</div>`:''}
-      <button class="plike" onclick="event.stopPropagation();toggleLike('${sku.id}',this)">${S.likes.has(sku.id)?'❤️':'🤍'}</button>
-    </div>
-    <div class="pcard-body" onclick="openDetail(${gi})">
-      <div class="pcard-name">${group[0].product_name}</div>
-      ${sku.listing&&sku.listing.short_description?`<div class="pcard-desc">${sku.listing.short_description}</div>`:''}
-      ${variantControlHtml}
-      <div class="pcard-price-row">
-        <span class="pcard-price" id="cardprice-${gi}">${price!=null?P(price):'—'}</span>
-        ${sku.is_on_sale&&sku.sale_price!=null?`<span class="pcard-strike" id="cardstrike-${gi}">${P(sku.retail_price_direct)}</span>`:''}
-      </div>
-      <button class="pcard-add" id="cardadd-${gi}" onclick="event.stopPropagation();quickAdd(${gi})" ${out?'disabled':''}>${out?'Out of Stock':'Add to Tote Bag'}</button>
-    </div>
-  </div>`;
-}
-function bindCardEvents(gi){
-  const scroller=$('cardscroll-'+gi);
-  if(!scroller)return;
-  scroller.addEventListener('scroll',()=>{
-    const idx=Math.round(scroller.scrollLeft/scroller.clientWidth);
-    document.querySelectorAll(`[data-gi="${gi}"] .pdot`).forEach((d,i)=>d.classList.toggle('on',i===idx));
-  });
-}
-function scrollCard(gi,idx){
-  const scroller=$('cardscroll-'+gi);
-  if(scroller)scroller.scrollTo({left:idx*scroller.clientWidth,behavior:'smooth'});
-}
-function updateCardForSku(gi,sku){
-  const price=effectivePrice(sku);
-  $('cardprice-'+gi).textContent=price!=null?P(price):'—';
-  const addBtn=$('cardadd-'+gi);
-  const out=sku.current_stock<=0;
-  addBtn.disabled=out;addBtn.textContent=out?'Out of Stock':'Add to Tote Bag';
-  addBtn.dataset.skuId=sku.id;
-}
-function cardVariantChange(gi,variantIdx){
-  const group=filteredGroups()[gi];
-  const sku=group[variantIdx];
-  updateCardForSku(gi,sku);
-  $('cardadd-'+gi).setAttribute('onclick',`event.stopPropagation();quickAddVariant(${gi},${variantIdx})`);
-}
-function cardAxis1Change(gi,axis1){
-  const group=filteredGroups()[gi];
-  const a2opts=axis2Options(group,axis1);
-  const a2sel=$('card-axis2-'+gi);
-  a2sel.innerHTML=a2opts.map(a=>`<option>${a}</option>`).join('');
-  cardAxis2Change(gi,a2opts[0]);
-}
-function cardAxis2Change(gi,axis2){
-  const group=filteredGroups()[gi];
-  const axis1=$('card-axis1-'+gi).value;
-  const sku=findByAxes(group,axis1,axis2);
-  if(!sku)return;
-  updateCardForSku(gi,sku);
-  $('cardadd-'+gi).setAttribute('onclick',`event.stopPropagation();quickAddSku(${gi},'${sku.id}')`);
-}
-function quickAdd(gi){quickAddVariant(gi,0);}
-function quickAddVariant(gi,variantIdx){
-  const group=filteredGroups()[gi];
-  const sku=group[variantIdx];
-  addToCart(sku.id,1);
-}
-function quickAddSku(gi,skuId){
-  addToCart(skuId,1);
-}
-function toggleLike(skuId,btn){
-  if(S.likes.has(skuId)){S.likes.delete(skuId);btn.textContent='🤍';}
-  else{S.likes.add(skuId);btn.textContent='❤️';}
-  saveLikes();
-}
-
-/* ─── INFINITE SCROLL ─── */
-new IntersectionObserver((entries)=>{
-  if(entries[0].isIntersecting){
-    const total=filteredGroups().length;
-    if(S.displayCount<total){S.displayCount+=12;renderGrid();}
-  }
-},{rootMargin:'200px'}).observe($('sentinel'));
-
-/* ─── ROUTING ─── */
-function handleRoute(){
-  const params=new URLSearchParams(location.search);
-  const sku=params.get('product');
-  if(sku){
-    const gi=S.groups.findIndex(g=>g.some(v=>v.sku_code===sku));
-    if(gi>-1){
-      const vi=S.groups[gi].findIndex(v=>v.sku_code===sku);
-      showDetail(gi,vi>-1?vi:0,false);
-      return;
-    }
-  }
-  showGrid(false);
-}
-window.addEventListener('popstate',handleRoute);
-
-function openDetail(gi){showDetail(gi,0,true);}
-function showDetail(gi,variantIdx,pushUrl){
-  const groups=filteredGroups();
-  const group = groups[gi] || S.groups[gi];
-  if(!group)return;
-  S.currentGroupIdx=gi;S.currentVariantIdx=variantIdx;
-  $('grid-view').style.display='none';
-  $('detail-view').style.display='block';
-  $('cat-bar').style.display='none';
-  renderDetail(group,variantIdx);
-  if(pushUrl){
-    const sku=group[variantIdx];
-    history.pushState({},'',`?product=${sku.sku_code}`);
-  }
-  window.scrollTo(0,0);
-}
-function showGrid(pushUrl){
-  $('grid-view').style.display='block';
-  $('detail-view').style.display='none';
-  $('cat-bar').style.display='flex';
-  if(pushUrl)history.pushState({},'',location.pathname);
-}
-
-let detailQty=1;
-function renderDetail(group,variantIdx){
-  detailQty=1;
-  const sku=group[variantIdx];
-  const imgs=galleryFor(sku);
-  const price=effectivePrice(sku);
-  const low=sku.current_stock<=sku.low_stock_threshold && sku.current_stock>0;
-  const out=sku.current_stock<=0;
-  const l=sku.listing||{};
-  const subs=[1,2,3,4].map(n=>({title:l['subsection_'+n+'_title'],body:l['subsection_'+n+'_body']})).filter(s=>s.title||s.body);
-  const twoAxis=isTwoAxis(group);
-
-  let variantControlHtml='';
-  if(twoAxis){
-    const a1opts=axis1Options(group);
-    const a2opts=axis2Options(group,sku.variant_axis_1);
-    variantControlHtml=`<label class="lbl">Color</label>
-      <select class="inp" id="detail-axis1" onchange="detailAxis1Change(this.value)">
-        ${a1opts.map(a=>`<option ${a===sku.variant_axis_1?'selected':''}>${a}</option>`).join('')}
-      </select>
-      <label class="lbl">Variant</label>
-      <select class="inp" id="detail-axis2" onchange="detailAxis2Change(this.value)">
-        ${a2opts.map(a=>`<option ${a===sku.variant_axis_2?'selected':''}>${a}</option>`).join('')}
-      </select>`;
-  }else if(group.length>1){
-    variantControlHtml=`<label class="lbl">Variant</label>
-      <select class="inp" id="detail-variant" onchange="detailVariantChange(this.selectedIndex)">
-        ${group.map((v,i)=>`<option ${i===variantIdx?'selected':''}>${v.variant||v.sku_code}</option>`).join('')}
-      </select>`;
-  }
-
-  $('detail-view').innerHTML=`
-    <button class="back-link" onclick="showGrid(true)">← Back to Shop</button>
-    <div class="detail-grid">
-      <div class="detail-gallery">
-        <div class="detail-scroll" id="detailscroll">
-          ${imgs.length?imgs.map(u=>`<img src="${u}">`).join(''):`<div class="detail-ph">🌿</div>`}
-        </div>
-        ${imgs.length>1?`<div class="detail-dots">${imgs.map((_,i)=>`<button class="ddot ${i===0?'on':''}" onclick="scrollDetail(${i})"></button>`).join('')}</div>`:''}
-        ${sku.ribbon_text?`<div class="pribbon">${sku.ribbon_text}</div>`:''}
-        ${low?`<div class="plow">Last ${sku.current_stock} left</div>`:out?`<div class="plow" style="background:var(--text-muted)">Out of Stock</div>`:''}
-      </div>
-      <div>
-        <h2 class="detail-name">${group[0].product_name}</h2>
-        <div class="detail-price-row">
-          <span class="detail-price" id="detailprice">${price!=null?P(price):'—'}</span>
-          ${sku.is_on_sale&&sku.sale_price!=null?`<span class="detail-strike" id="detailstrike">${P(sku.retail_price_direct)}</span>`:''}
-        </div>
-        ${variantControlHtml}
-        <label class="lbl">Quantity</label>
-        <div class="qty-row">
-          <button class="qty-btn" onclick="changeQty(-1)">−</button>
-          <span class="qty-val" id="detail-qty">1</span>
-          <button class="qty-btn" onclick="changeQty(1)">+</button>
-        </div>
-        <div class="detail-btns">
-          <button class="btn btn-o ${S.likes.has(sku.id)?'liked':''}" id="detail-like" onclick="toggleDetailLike('${sku.id}')">${S.likes.has(sku.id)?'❤️':'🤍'}</button>
-          <button class="btn btn-p" id="detail-add" ${out?'disabled':''} onclick="detailAddToCart()">Add to Tote Bag</button>
-          <button class="btn btn-g" id="detail-buy" ${out?'disabled':''} onclick="detailBuyNow()">Buy Now</button>
-        </div>
-        ${l.long_description?`<p class="detail-desc">${l.long_description}</p>`:''}
-        ${subs.map((s,i)=>`<div class="subdesc" onclick="toggleSub(${i})">
-          <div class="subdesc-hdr">${s.title||''} <span id="subarrow-${i}">▼</span></div>
-          <div class="subdesc-body" id="subbody-${i}">${s.body||''}</div>
-        </div>`).join('')}
-      </div>
-    </div>`;
-
-  const scroller=$('detailscroll');
-  if(scroller)scroller.addEventListener('scroll',()=>{
-    const idx=Math.round(scroller.scrollLeft/scroller.clientWidth);
-    document.querySelectorAll('.ddot').forEach((d,i)=>d.classList.toggle('on',i===idx));
-  });
-}
-function scrollDetail(idx){const s=$('detailscroll');if(s)s.scrollTo({left:idx*s.clientWidth,behavior:'smooth'});}
-function toggleSub(i){
-  $('subbody-'+i).classList.toggle('open');
-  $('subarrow-'+i).textContent=$('subbody-'+i).classList.contains('open')?'▲':'▼';
-}
-function changeQty(delta){
-  detailQty=Math.max(1,detailQty+delta);
-  $('detail-qty').textContent=detailQty;
-}
-function detailVariantChange(idx){
-  showDetail(S.currentGroupIdx,idx,true);
-}
-function detailAxis1Change(axis1){
-  const group=filteredGroups()[S.currentGroupIdx]||S.groups[S.currentGroupIdx];
-  const a2opts=axis2Options(group,axis1);
-  const sku=findByAxes(group,axis1,a2opts[0]);
-  const idx=group.indexOf(sku);
-  showDetail(S.currentGroupIdx,idx,true);
-}
-function detailAxis2Change(axis2){
-  const group=filteredGroups()[S.currentGroupIdx]||S.groups[S.currentGroupIdx];
-  const axis1=$('detail-axis1').value;
-  const sku=findByAxes(group,axis1,axis2);
-  const idx=group.indexOf(sku);
-  showDetail(S.currentGroupIdx,idx,true);
-}
-function toggleDetailLike(skuId){
-  if(S.likes.has(skuId)){S.likes.delete(skuId);$('detail-like').textContent='🤍';$('detail-like').classList.remove('liked');}
-  else{S.likes.add(skuId);$('detail-like').textContent='❤️';$('detail-like').classList.add('liked');}
-  saveLikes();
-}
-function currentDetailSku(){
-  const group=filteredGroups()[S.currentGroupIdx]||S.groups[S.currentGroupIdx];
-  return group[S.currentVariantIdx];
-}
-function detailAddToCart(){
-  const sku=currentDetailSku();
-  addToCart(sku.id,detailQty);
-}
-function detailBuyNow(){
-  const sku=currentDetailSku();
-  addToCart(sku.id,detailQty,true);
-  openCart();
-}
-
-/* ─── CART ─── */
-function addToCart(skuId,qty,silent){
-  const existing=S.cart.find(i=>i.sku_id===skuId);
-  if(existing)existing.qty+=qty;
-  else S.cart.push({sku_id:skuId,qty});
-  saveCart();
-  if(!silent)toast('✓ Added to your tote bag!');
-}
-function updateCartBadge(){
-  const count=S.cart.reduce((s,i)=>s+i.qty,0);
-  const badge=$('cart-badge');
-  badge.textContent=count;
-  badge.style.display=count>0?'flex':'none';
-}
-function openCart(){renderCart();$('cart-overlay').classList.add('show');$('cart-drawer').classList.add('show');}
-function closeCart(){$('cart-overlay').classList.remove('show');$('cart-drawer').classList.remove('show');}
-function renderCart(){
-  if(!S.cart.length){
-    $('cart-items').innerHTML=`<div class="empty">Your tote bag is empty.</div>`;
-    $('cart-total').textContent=P(0);
-    return;
-  }
-  let total=0;
-  $('cart-items').innerHTML=S.cart.map((item,idx)=>{
-    const sku=S.skus.find(s=>s.id===item.sku_id);
-    if(!sku)return '';
-    const price=effectivePrice(sku);
-    const lineTotal=price*item.qty;
-    total+=lineTotal;
-    const img=sku.cover_image_url;
-    return `<div class="cart-item">
-      <div class="cart-item-img">${img?`<img src="${img}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">`:'🌿'}</div>
-      <div class="cart-item-info">
-        <div class="cart-item-name">${sku.product_name}</div>
-        ${sku.variant?`<div class="cart-item-var">${sku.variant}</div>`:''}
-        <div class="cart-item-row">
-          <div class="cart-item-qty">
-            <button class="cart-qbtn" onclick="changeCartQty(${idx},-1)">−</button>
-            <span>${item.qty}</span>
-            <button class="cart-qbtn" onclick="changeCartQty(${idx},1)">+</button>
-          </div>
-          <span class="cart-item-price">${P(lineTotal)}</span>
-        </div>
-        <button class="cart-remove" onclick="removeCartItem(${idx})">Remove</button>
-      </div>
-    </div>`;
-  }).join('');
-  $('cart-total').textContent=P(total);
-}
-function changeCartQty(idx,delta){
-  S.cart[idx].qty=Math.max(1,S.cart[idx].qty+delta);
-  saveCart();renderCart();
-}
-function removeCartItem(idx){
-  S.cart.splice(idx,1);
-  saveCart();renderCart();
-}
-function goCheckout(){
-  toast('Checkout is launching very soon — thanks for your patience! 🌿');
-}
-
-/* ─── AUTH (same pattern as the coming-soon page) ─── */
 const SESSION_KEY='mcc_customer_session';
 let authMode='signin';
+
 function saveSession(data){
-  localStorage.setItem(SESSION_KEY, JSON.stringify({access_token:data.access_token,refresh_token:data.refresh_token,expires_at:Date.now()+((data.expires_in||3600)*1000),user:data.user}));
+  localStorage.setItem(SESSION_KEY, JSON.stringify({
+    access_token:data.access_token, refresh_token:data.refresh_token,
+    expires_at:Date.now()+((data.expires_in||3600)*1000), user:data.user
+  }));
 }
 function loadSession(){try{const raw=localStorage.getItem(SESSION_KEY);return raw?JSON.parse(raw):null;}catch(e){return null;}}
 function clearSession(){localStorage.removeItem(SESSION_KEY);}
-function openAuthModal(){$('auth-modal').classList.add('show');}
-function openMobileNav(){document.getElementById('mobile-nav-overlay').classList.add('show');}
-function closeMobileNav(){document.getElementById('mobile-nav-overlay').classList.remove('show');}
-function closeAuthModal(){$('auth-modal').classList.remove('show');}
+
+function openAuthModal(){document.getElementById('auth-modal').classList.add('show');}
+function closeAuthModal(){document.getElementById('auth-modal').classList.remove('show');}
+
 function signInFormHtml(){
-  return `<h2>Welcome</h2><div class="auth-tabs"><button class="auth-tab on" onclick="setAuthMode('signin')">Log In</button><button class="auth-tab" onclick="setAuthMode('signup')">Sign Up</button></div>
+  return `<h2>Welcome</h2>
+    <div class="auth-tabs">
+      <button class="auth-tab on" id="tab-signin" onclick="setAuthMode('signin')">Log In</button>
+      <button class="auth-tab" id="tab-signup" onclick="setAuthMode('signup')">Sign Up</button>
+    </div>
     <div class="auth-err" id="auth-err"></div>
-    <label class="lbl">Email</label><input class="inp" type="email" id="auth-email" placeholder="you@email.com">
-    <label class="lbl">Password</label><input class="inp" type="password" id="auth-pw" placeholder="••••••••">
-    <button class="btn btn-p" style="width:100%" id="auth-submit" onclick="submitAuth()">Log In</button>`;
+    <label class="lbl">Email</label>
+    <input class="inp" type="email" id="auth-email" placeholder="you@email.com">
+    <label class="lbl">Password</label>
+    <input class="inp" type="password" id="auth-pw" placeholder="••••••••">
+    <button class="btn btn-p" id="auth-submit" onclick="submitAuth()">Log In</button>
+    <p class="gmail-note">Sign in with Google is coming soon — email works for now.</p>`;
 }
 function signUpFormHtml(){
-  return `<h2>Welcome</h2><div class="auth-tabs"><button class="auth-tab" onclick="setAuthMode('signin')">Log In</button><button class="auth-tab on" onclick="setAuthMode('signup')">Sign Up</button></div>
+  return `<h2>Welcome</h2>
+    <div class="auth-tabs">
+      <button class="auth-tab" id="tab-signin" onclick="setAuthMode('signin')">Log In</button>
+      <button class="auth-tab on" id="tab-signup" onclick="setAuthMode('signup')">Sign Up</button>
+    </div>
     <div class="auth-err" id="auth-err"></div>
-    <label class="lbl">Email</label><input class="inp" type="email" id="auth-email" placeholder="you@email.com">
-    <label class="lbl">Password</label><input class="inp" type="password" id="auth-pw" placeholder="••••••••">
-    <button class="btn btn-p" style="width:100%" id="auth-submit" onclick="submitAuth()">Create Account</button>`;
+    <label class="lbl">Email</label>
+    <input class="inp" type="email" id="auth-email" placeholder="you@email.com">
+    <label class="lbl">Password</label>
+    <input class="inp" type="password" id="auth-pw" placeholder="••••••••">
+    <button class="btn btn-p" id="auth-submit" onclick="submitAuth()">Create Account</button>
+    <p class="gmail-note">Sign in with Google is coming soon — email works for now.</p>
+    <p class="gmail-note">Own a hotel, cafe, or shop? <a href="#" onclick="closeAuthModal();openLeadModal();return false;" style="color:var(--lagoon);font-weight:600">Ask about becoming a partner →</a></p>`;
 }
-function setAuthMode(mode){authMode=mode;$('auth-content').innerHTML=mode==='signin'?signInFormHtml():signUpFormHtml();}
-async function submitAuth(){
-  const email=$('auth-email').value.trim(),pw=$('auth-pw').value;
-  const errBox=$('auth-err');errBox.style.display='none';
-  if(!email||!pw){errBox.textContent='Enter your email and password.';errBox.style.display='block';return;}
-  const btn=$('auth-submit');const orig=btn.textContent;btn.textContent='Please wait...';btn.disabled=true;
+function setAuthMode(mode){
+  authMode=mode;
+  document.getElementById('auth-content').innerHTML = mode==='signin' ? signInFormHtml() : signUpFormHtml();
+}
+
+async function notifyTelegram(message){
   try{
-    const endpoint=authMode==='signin'?'token?grant_type=password':'signup';
-    const r=await fetch(`${SB_URL}/auth/v1/${endpoint}`,{method:'POST',headers:{apikey:SB_KEY,'Content-Type':'application/json'},body:JSON.stringify({email,password:pw})});
+    await fetch('/api/notify-telegram',{
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})
+    });
+  }catch(e){console.warn('Telegram notify failed:',e);}
+}
+
+async function submitAuth(){
+  const email=document.getElementById('auth-email').value.trim();
+  const pw=document.getElementById('auth-pw').value;
+  const errBox=document.getElementById('auth-err');
+  errBox.style.display='none';
+  if(!email||!pw){errBox.textContent='Enter your email and password.';errBox.style.display='block';return;}
+  const btn=document.getElementById('auth-submit');
+  const origLabel=btn.textContent;btn.textContent='Please wait...';btn.disabled=true;
+  try{
+    const endpoint = authMode==='signin' ? 'token?grant_type=password' : 'signup';
+    const r=await fetch(`${SB_URL}/auth/v1/${endpoint}`,{
+      method:'POST',
+      headers:{'apikey':SB_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({email,password:pw})
+    });
     const data=await r.json();
-    if(!r.ok)throw new Error(data.error_description||data.msg||'Something went wrong.');
-    if(authMode==='signup'&&!data.access_token){
-      $('auth-content').innerHTML=`<div class="auth-ok"><h3>Almost there!</h3><p>Check your email to confirm your account, then log in.</p></div>`;
+    if(!r.ok) throw new Error(data.error_description||data.msg||'Something went wrong.');
+    if(authMode==='signup' && !data.access_token){
+      showAuthSuccess("Almost there!", "Check your email to confirm your account, then log in.");
       return;
     }
     saveSession(data);
     showLoggedInState(data.user.email);
-  }catch(e){errBox.textContent=e.message;errBox.style.display='block';}
-  finally{btn.textContent=orig;btn.disabled=false;}
+  }catch(e){
+    errBox.textContent=e.message;errBox.style.display='block';
+  }finally{
+    btn.textContent=origLabel;btn.disabled=false;
+  }
+}
+
+function showAuthSuccess(title,body){
+  document.getElementById('auth-content').innerHTML=`
+    <div class="auth-ok"><h3>${title}</h3><p>${body}</p></div>`;
 }
 function showLoggedInState(email){
-  $('auth-link').textContent='My Account';
-  $('auth-content').innerHTML=`<div class="auth-ok"><h3>Welcome back! 🌿</h3><p>Logged in as <strong>${email}</strong>.</p></div><button class="btn btn-p" style="width:100%;margin-top:14px" onclick="doLogout()">Log Out</button>`;
+  document.getElementById('auth-link').textContent='My Account';
+  document.getElementById('auth-content').innerHTML=`
+    <div class="auth-ok">
+      <h3>You're in! 🌿</h3>
+      <p>Logged in as <strong>${email}</strong>. The shop isn't open yet, but your account is ready — order history and everything else will show up here once we launch.</p>
+    </div>
+    <button class="btn btn-p" style="margin-top:14px" onclick="doLogout()">Log Out</button>`;
 }
+
 function doLogout(){
-  clearSession();$('auth-link').textContent='Log In / Sign Up';authMode='signin';
-  $('auth-content').innerHTML=signInFormHtml();closeAuthModal();
+  clearSession();
+  document.getElementById('auth-link').textContent='Log In / Sign Up';
+  authMode='signin';
+  document.getElementById('auth-content').innerHTML=signInFormHtml();
+  closeAuthModal();
 }
+
+// Restore session on load, if valid
 (function(){
   const session=loadSession();
-  if(session&&Date.now()<session.expires_at){
-    $('auth-link').textContent='My Account';
-    $('auth-link').onclick=function(){openAuthModal();showLoggedInState(session.user.email);};
+  if(session && Date.now()<session.expires_at){
+    document.getElementById('auth-link').textContent='My Account';
+    document.getElementById('auth-link').onclick=function(){openAuthModal();showLoggedInState(session.user.email);};
   }
 })();
 
-init();
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter' && document.getElementById('auth-modal').classList.contains('show')){
+    const active=document.activeElement;
+    if(active && (active.id==='auth-email'||active.id==='auth-pw'))submitAuth();
+  }
+});
+
+/* ─── PARTNER LEAD FORM (no account created — just notifies Lois) ─── */
+function openLeadModal(){document.getElementById('lead-modal').classList.add('show');}
+function closeLeadModal(){document.getElementById('lead-modal').classList.remove('show');}
+async function submitLead(){
+  const name=document.getElementById('lead-name').value.trim();
+  const email=document.getElementById('lead-email').value.trim();
+  const biz=document.getElementById('lead-biz').value.trim();
+  const msg=document.getElementById('lead-msg').value.trim();
+  const errBox=document.getElementById('lead-err');
+  errBox.style.display='none';
+  if(!name||!email||!biz){errBox.textContent='Name, email, and business name are required.';errBox.style.display='block';return;}
+  const btn=document.getElementById('lead-submit');
+  const origLabel=btn.textContent;btn.textContent='Sending...';btn.disabled=true;
+  try{
+    await notifyTelegram(`🤝 *New Partnership Inquiry*\nName: ${name}\nEmail: ${email}\nBusiness: ${biz}\n${msg?'Message: '+msg:''}`);
+    document.getElementById('lead-content').innerHTML=`<div class="auth-ok"><h3>Thanks! 🌿</h3><p>We'll be in touch soon about partnering with ${biz}.</p></div>`;
+  }catch(e){
+    errBox.textContent='Something went wrong — try reaching us directly instead.';errBox.style.display='block';
+  }finally{
+    btn.textContent=origLabel;btn.disabled=false;
+  }
+}
 </script>
 </body>
 </html>
