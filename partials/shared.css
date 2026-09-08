@@ -1,76 +1,172 @@
 /* ============================================================
-   SHARED HEADER / FOOTER / CART / AUTH / MOBILE NAV
-   One file, included on every page. Edit here, it updates everywhere.
-   Assumes each page already defines these CSS variables:
-   --lagoon --lagoon-dark --teal --sand --sand-light --pearl --linen
-   --text-dark --text-mid --text-muted --shadow --shadow-lg
+   SHARED CART / AUTH / MOBILE NAV LOGIC
+   One file, included on every page. Assumes each page defines
+   SB_URL and SB_KEY before this script loads, and has the header/
+   footer/cart/modal HTML already injected into the page.
    ============================================================ */
 
-.hdr{position:sticky;top:0;z-index:90;background:var(--linen,var(--pearl));border-bottom:1px solid var(--sand)}
-.hdr-inner{max-width:1200px;margin:0 auto;padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
-.hdr-actions{display:flex;align-items:center;gap:10px}
-.hdr-nav-links{display:flex;gap:1.4rem;font-size:13px}
-.hdr-nav-links a{text-decoration:none}
-.hdr-btn{background:none;border:none;font-size:20px;color:var(--lagoon);position:relative;padding:4px;cursor:pointer}
-.cart-badge{position:absolute;top:-2px;right:-2px;background:#C1121F;color:white;font-size:10px;font-weight:700;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center}
-.auth-link{background:var(--lagoon);color:var(--pearl);border:none;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:500;cursor:pointer}
-.hamburger-btn{display:none;background:none;border:none;font-size:22px;color:var(--lagoon);cursor:pointer;padding:4px}
-@media(max-width:759px){
-  .hdr-nav-links{display:none}
-  #auth-link{display:none}
-  .hamburger-btn{display:block}
+const P = n => '₱' + (parseFloat(n) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/* ─── CART (shared localStorage across all pages) ─── */
+let cart = JSON.parse(localStorage.getItem('mcc_cart') || '[]');
+function updateCartBadge() {
+  const badge = document.getElementById('cart-badge');
+  if (!badge) return;
+  const count = cart.reduce((s, i) => s + i.qty, 0);
+  badge.textContent = count;
+  badge.style.display = count > 0 ? 'flex' : 'none';
+}
+async function openCart() {
+  const overlay = document.getElementById('cart-overlay');
+  const drawer = document.getElementById('cart-drawer');
+  if (!overlay || !drawer) return;
+  overlay.classList.add('show');
+  drawer.classList.add('show');
+  const container = document.getElementById('cart-items');
+  if (!cart.length) {
+    container.innerHTML = '<div class="cart-empty">Your tote bag is empty.</div>';
+    document.getElementById('cart-total').textContent = P(0);
+    return;
+  }
+  try {
+    const ids = cart.map(i => i.sku_id).join(',');
+    const r = await fetch(`${SB_URL}/rest/v1/skus?id=in.(${ids})&select=*`, { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } });
+    const skus = r.ok ? await r.json() : [];
+    let total = 0;
+    container.innerHTML = cart.map(item => {
+      const sku = skus.find(s => s.id === item.sku_id);
+      if (!sku) return '';
+      const price = (sku.is_on_sale && sku.sale_price != null) ? sku.sale_price : sku.retail_price_direct;
+      const lineTotal = (price || 0) * item.qty; total += lineTotal;
+      return `<div class="cart-item">
+        <div class="cart-item-img">🌿</div>
+        <div class="cart-item-info">
+          <div class="cart-item-name">${sku.product_name}</div>
+          ${sku.variant ? `<div class="cart-item-var">${sku.variant}</div>` : ''}
+          <div class="cart-item-row"><span>Qty: ${item.qty}</span><span class="cart-item-price">${P(lineTotal)}</span></div>
+        </div>
+      </div>`;
+    }).join('');
+    document.getElementById('cart-total').textContent = P(total);
+  } catch (e) {
+    container.innerHTML = '<div class="cart-empty">Could not load your tote bag.</div>';
+  }
+}
+function closeCart() {
+  const overlay = document.getElementById('cart-overlay');
+  const drawer = document.getElementById('cart-drawer');
+  if (overlay) overlay.classList.remove('show');
+  if (drawer) drawer.classList.remove('show');
 }
 
-/* MOBILE NAV OVERLAY */
-.mobile-nav-overlay{position:fixed;inset:0;background:var(--lagoon);z-index:300;display:none;flex-direction:column;align-items:center;justify-content:center;gap:1.6rem}
-.mobile-nav-overlay.show{display:flex}
-.mobile-nav-overlay a,.mobile-nav-overlay button.mnav-item{color:white;font-size:1.3rem;font-weight:600;background:none;border:none;cursor:pointer;text-decoration:none}
-.mobile-nav-close{position:absolute;top:20px;right:20px;font-size:30px;color:white;background:none;border:none;cursor:pointer;line-height:1}
+/* ─── AUTH ─── */
+const SESSION_KEY = 'mcc_customer_session';
+let authMode = 'signin';
+function saveSession(data) { localStorage.setItem(SESSION_KEY, JSON.stringify({ access_token: data.access_token, refresh_token: data.refresh_token, expires_at: Date.now() + ((data.expires_in || 3600) * 1000), user: data.user })); }
+function loadSession() { try { const raw = localStorage.getItem(SESSION_KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
+function clearSession() { localStorage.removeItem(SESSION_KEY); }
+function openAuthModal() { const m = document.getElementById('auth-modal'); if (m) m.classList.add('show'); }
+function closeAuthModal() { const m = document.getElementById('auth-modal'); if (m) m.classList.remove('show'); }
+function signInFormHtml() {
+  return `<h2>Welcome</h2><div class="auth-tabs"><button class="auth-tab on" onclick="setAuthMode('signin')">Log In</button><button class="auth-tab" onclick="setAuthMode('signup')">Sign Up</button></div>
+    <div class="auth-err" id="auth-err"></div>
+    <label class="lbl">Email</label><input class="inp" type="email" id="auth-email" placeholder="you@email.com">
+    <label class="lbl">Password</label><input class="inp" type="password" id="auth-pw" placeholder="••••••••">
+    <button class="btn btn-p" style="width:100%" id="auth-submit" onclick="submitAuth()">Log In</button>`;
+}
+function signUpFormHtml() {
+  return `<h2>Welcome</h2><div class="auth-tabs"><button class="auth-tab" onclick="setAuthMode('signin')">Log In</button><button class="auth-tab on" onclick="setAuthMode('signup')">Sign Up</button></div>
+    <div class="auth-err" id="auth-err"></div>
+    <label class="lbl">Email</label><input class="inp" type="email" id="auth-email" placeholder="you@email.com">
+    <label class="lbl">Password</label><input class="inp" type="password" id="auth-pw" placeholder="••••••••">
+    <button class="btn btn-p" style="width:100%" id="auth-submit" onclick="submitAuth()">Create Account</button>`;
+}
+function setAuthMode(mode) { authMode = mode; document.getElementById('auth-content').innerHTML = mode === 'signin' ? signInFormHtml() : signUpFormHtml(); }
+async function submitAuth() {
+  const email = document.getElementById('auth-email').value.trim(), pw = document.getElementById('auth-pw').value;
+  const errBox = document.getElementById('auth-err'); errBox.style.display = 'none';
+  if (!email || !pw) { errBox.textContent = 'Enter your email and password.'; errBox.style.display = 'block'; return; }
+  const btn = document.getElementById('auth-submit'); const orig = btn.textContent; btn.textContent = 'Please wait...'; btn.disabled = true;
+  try {
+    const endpoint = authMode === 'signin' ? 'token?grant_type=password' : 'signup';
+    const r = await fetch(`${SB_URL}/auth/v1/${endpoint}`, { method: 'POST', headers: { apikey: SB_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: pw }) });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error_description || data.msg || 'Something went wrong.');
+    if (authMode === 'signup' && !data.access_token) {
+      document.getElementById('auth-content').innerHTML = `<div class="auth-ok"><h3>Almost there!</h3><p>Check your email to confirm your account, then log in.</p></div>`;
+      return;
+    }
+    saveSession(data);
+    showLoggedInState(data.user.email);
+  } catch (e) { errBox.textContent = e.message; errBox.style.display = 'block'; }
+  finally { btn.textContent = orig; btn.disabled = false; }
+}
+function showLoggedInState(email) {
+  const link = document.getElementById('auth-link');
+  if (link) link.textContent = 'My Account';
+  document.getElementById('auth-content').innerHTML = `<div class="auth-ok"><h3>Welcome back! 🌿</h3><p>Logged in as <strong>${email}</strong>.</p></div><button class="btn btn-p" style="width:100%;margin-top:14px" onclick="doLogout()">Log Out</button>`;
+}
+function doLogout() {
+  clearSession();
+  const link = document.getElementById('auth-link');
+  if (link) link.textContent = 'Log In / Sign Up';
+  authMode = 'signin';
+  document.getElementById('auth-content').innerHTML = signInFormHtml();
+  closeAuthModal();
+}
+function restoreSessionUI() {
+  const session = loadSession();
+  if (session && Date.now() < session.expires_at) {
+    const link = document.getElementById('auth-link');
+    if (link) {
+      link.textContent = 'My Account';
+      link.onclick = function () { openAuthModal(); showLoggedInState(session.user.email); };
+    }
+  }
+}
 
-/* CART DRAWER */
-.cart-overlay{position:fixed;inset:0;background:rgba(28,46,44,.5);z-index:150;display:none}
-.cart-overlay.show{display:block}
-.cart-drawer{position:fixed;top:0;right:0;bottom:0;width:100%;max-width:420px;background:white;z-index:151;transform:translateX(100%);transition:transform .25s;display:flex;flex-direction:column;box-shadow:var(--shadow-lg)}
-.cart-drawer.show{transform:translateX(0)}
-.cart-hdr{padding:1.25rem;border-bottom:1px solid var(--sand);display:flex;justify-content:space-between;align-items:center}
-.cart-hdr h2{font-size:1.3rem;color:var(--lagoon)}
-.cart-close{background:var(--sand);border:none;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer}
-.cart-items{flex:1;overflow-y:auto;padding:1rem 1.25rem}
-.cart-item{display:flex;gap:10px;padding:12px 0;border-bottom:1px solid var(--sand-light)}
-.cart-item-img{width:56px;height:56px;border-radius:8px;background:var(--sand-light);flex-shrink:0;object-fit:cover;display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--teal-light,var(--teal))}
-.cart-item-info{flex:1}
-.cart-item-name{font-size:13px;font-weight:500}
-.cart-item-var{font-size:11px;color:var(--text-muted)}
-.cart-item-row{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
-.cart-item-price{font-size:13px;font-weight:600;color:var(--lagoon)}
-.cart-footer{padding:1.25rem;border-top:1px solid var(--sand)}
-.cart-total-row{display:flex;justify-content:space-between;margin-bottom:12px}
-.cart-total-lbl{font-size:14px;color:var(--text-mid)}
-.cart-total-amt{font-family:'Cormorant Garamond',serif;font-size:1.4rem;color:var(--lagoon);font-weight:600}
-.cart-empty{text-align:center;padding:2rem 1rem;color:var(--text-muted)}
+/* ─── MOBILE NAV ─── */
+function openMobileNav() { const el = document.getElementById('mobile-nav-overlay'); if (el) el.classList.add('show'); }
+function closeMobileNav() { const el = document.getElementById('mobile-nav-overlay'); if (el) el.classList.remove('show'); }
 
-/* AUTH MODAL */
-.modal{position:fixed;inset:0;background:rgba(28,46,44,.65);z-index:200;display:none;align-items:center;justify-content:center;padding:1rem}
-.modal.show{display:flex}
-.modal-box{background:white;border-radius:16px;padding:2rem 1.75rem;width:100%;max-width:380px;box-shadow:var(--shadow-lg);position:relative;max-height:90vh;overflow-y:auto}
-.modal-close{position:absolute;top:12px;right:14px;background:var(--sand);border:none;border-radius:50%;width:30px;height:30px;font-size:16px;display:flex;align-items:center;justify-content:center;color:var(--text-mid);cursor:pointer}
-.modal-box h2{font-size:1.5rem;color:var(--lagoon);text-align:center;margin-bottom:1.25rem}
-.auth-tabs{display:flex;background:var(--linen,var(--pearl));border-radius:9px;padding:3px;margin-bottom:1.25rem}
-.auth-tab{flex:1;padding:8px;border:none;background:none;border-radius:7px;font-size:13px;font-weight:500;color:var(--text-muted);cursor:pointer}
-.auth-tab.on{background:white;color:var(--lagoon);box-shadow:var(--shadow)}
-.auth-err{background:#FFE8E8;border:1px solid #F5A0A0;color:#C1121F;font-size:13px;padding:9px 12px;border-radius:8px;margin-bottom:12px;display:none}
-.auth-ok{background:#D8F3DC;border:1px solid #A3D9B1;color:#2D6A4F;text-align:center;padding:1.5rem 1rem;border-radius:9px}
-.auth-ok h3{color:#2D6A4F;margin-bottom:6px}
-.auth-ok p{font-size:13px;color:var(--text-mid);line-height:1.5}
+/* ─── GENERIC PARTIAL LOADER ───
+   Fetches an HTML file and drops it in place of a placeholder element.
+   Use this for the header/footer AND for any future page section that
+   should live in its own file instead of being pasted into the page.
 
-/* FOOTER */
-footer{background:var(--text-dark,#1C2E2C);color:rgba(247,243,236,.65);padding:2.8rem 1.5rem}
-.foot-inner{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:1.8rem;text-align:center;align-items:center}
-.foot-col{display:flex;flex-direction:column;gap:7px;font-size:12.5px}
-.foot-col a,.foot-link-btn{color:inherit;text-decoration:none;background:none;border:none;font-size:12.5px;cursor:pointer;padding:0;font-family:inherit;text-align:center}
-.foot-col-title{color:white;font-weight:600;margin-bottom:2px}
-@media(min-width:800px){
-  .foot-inner{flex-direction:row;justify-content:space-between;text-align:left;align-items:flex-start}
-  .foot-col{text-align:left}
-  .foot-col a,.foot-link-btn{text-align:left}
+   Usage on a page:
+     <div id="section-something"></div>
+     <script>loadPartial('section-something', '/partials/something.html');</script>
+
+   If the partial file doesn't exist yet (e.g. still being drafted), this
+   fails quietly — the placeholder just stays empty — instead of dumping a
+   "404 Not Found" error page into the layout. */
+async function loadPartial(placeholderId, url) {
+  const el = document.getElementById(placeholderId);
+  if (!el) return;
+  try {
+    const r = await fetch(url);
+    if (!r.ok) { console.warn('Partial not found yet:', url); return; }
+    const html = await r.text();
+    el.outerHTML = html;
+    // Setting outerHTML does NOT execute any <script> tags inside it —
+    // that's a browser security quirk, not a bug — so re-create and run
+    // them manually if the partial brought any along.
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    tmp.querySelectorAll('script').forEach(oldScript => {
+      const newScript = document.createElement('script');
+      if (oldScript.src) newScript.src = oldScript.src;
+      else newScript.textContent = oldScript.textContent;
+      document.body.appendChild(newScript);
+    });
+  } catch (e) { console.warn('Partial failed to load:', url, e); }
+}
+
+/* ─── PARTIAL LOADER — call this from each page ─── */
+async function loadSharedParts() {
+  await loadPartial('site-header', '/partials/header.html');
+  await loadPartial('site-footer', '/partials/footer.html');
+  updateCartBadge();
+  restoreSessionUI();
 }
