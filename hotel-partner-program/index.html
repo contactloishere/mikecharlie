@@ -33,8 +33,8 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer}
 .site-links a{color:var(--text-mid);font-weight:500}
 .site-links a.on{color:var(--lagoon)}
 
-.hdr{position:sticky;top:0;z-index:90;background:var(--linen);border-bottom:1px solid var(--sand)}
-.hdr-inner{max-width:1200px;margin:0 auto;padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.hdr{position:sticky;top:0;z-index:90;background:var(--linen);border-bottom:1px solid var(--sand);padding:1rem 1.25rem}
+.hdr-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
 .hdr-actions{display:flex;align-items:center;gap:10px}
 .hdr-nav-links{display:flex;gap:1.4rem;font-size:13px}
 .hamburger-btn{display:none;background:none;border:none;font-size:22px;color:var(--lagoon);cursor:pointer;padding:4px}
@@ -140,6 +140,11 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer}
 .ref-block-col{padding:1.5rem;display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:280px}
 .ref-block-col img{max-width:100%;width:auto;height:auto;max-height:280px;object-fit:contain}
 @media(min-width:700px){.ref-block-col img{max-height:100%}}
+@media(max-width:699px){
+  /* Each photo gets most of the phone screen as you scroll to it — tall enough to read as its own moment, short of full-bleed so the next section still peeks in */
+  .ref-block-col{min-height:78vh}
+  .ref-block-col img{max-height:100%}
+}
 
 /* BRANDING */
 .brand-split{max-width:1120px;margin:0 auto;display:grid;grid-template-columns:1fr;gap:2.5rem;align-items:center}
@@ -436,6 +441,10 @@ footer{background:var(--ink);color:rgba(247,243,236,.65);padding:2.5rem 1.5rem}
   </div>
 </section>
 
+<!-- NEW SECTION (placeholder) — content lives in /partials/hotel-partner-new-section.html, not in this file.
+     Currently empty/invisible until that file exists. Move this whole <div> tag if you'd rather it sit elsewhere on the page. -->
+<div id="section-hotel-new"></div>
+
 <!-- FAQ -->
 <section class="sec sec-pearl">
   <div class="sec-head"><span class="eyebrow">FAQ</span><h2>Before we get started.</h2></div>
@@ -540,6 +549,7 @@ footer{background:var(--ink);color:rgba(247,243,236,.65);padding:2.5rem 1.5rem}
 const SB_URL='https://cdczxunygdmswgdzkbed.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkY3p4dW55Z2Rtc3dnZHprYmVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxOTg5NjksImV4cCI6MjEwMjc3NDk2OX0.IrC05NPev5Zp6uV0DMe0gZI3boQsqXuTYSTVdyn8oWg';
 loadSharedParts();
+loadPartial('section-hotel-new','/partials/hotel-partner-new-section.html'); // safe to leave in even before that file exists — see loadPartial() in shared.js
 function scrollToForm(){document.getElementById('inquiry-form').scrollIntoView({behavior:'smooth'});}
 /* Cart (open/close/badge) and mobile nav open/close all live in /partials/shared.js now — do not redeclare them here. */
 
