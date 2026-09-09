@@ -129,22 +129,44 @@ function restoreSessionUI() {
 function openMobileNav() { const el = document.getElementById('mobile-nav-overlay'); if (el) el.classList.add('show'); }
 function closeMobileNav() { const el = document.getElementById('mobile-nav-overlay'); if (el) el.classList.remove('show'); }
 
+/* ─── GENERIC PARTIAL LOADER ───
+   Fetches an HTML file and drops it in place of a placeholder element.
+   Use this for the header/footer AND for any future page section that
+   should live in its own file instead of being pasted into the page.
+
+   Usage on a page:
+     <div id="section-something"></div>
+     <script>loadPartial('section-something', '/partials/something.html');</script>
+
+   If the partial file doesn't exist yet (e.g. still being drafted), this
+   fails quietly — the placeholder just stays empty — instead of dumping a
+   "404 Not Found" error page into the layout. */
+async function loadPartial(placeholderId, url) {
+  const el = document.getElementById(placeholderId);
+  if (!el) return;
+  try {
+    const r = await fetch(url);
+    if (!r.ok) { console.warn('Partial not found yet:', url); return; }
+    const html = await r.text();
+    el.outerHTML = html;
+    // Setting outerHTML does NOT execute any <script> tags inside it —
+    // that's a browser security quirk, not a bug — so re-create and run
+    // them manually if the partial brought any along.
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    tmp.querySelectorAll('script').forEach(oldScript => {
+      const newScript = document.createElement('script');
+      if (oldScript.src) newScript.src = oldScript.src;
+      else newScript.textContent = oldScript.textContent;
+      document.body.appendChild(newScript);
+    });
+  } catch (e) { console.warn('Partial failed to load:', url, e); }
+}
+
 /* ─── PARTIAL LOADER — call this from each page ─── */
 async function loadSharedParts() {
-  const headerEl = document.getElementById('site-header');
-  const footerEl = document.getElementById('site-footer');
-  try {
-    if (headerEl) {
-      const r = await fetch('/partials/header.html');
-      headerEl.outerHTML = await r.text();
-    }
-  } catch (e) { console.warn('Header failed to load', e); }
-  try {
-    if (footerEl) {
-      const r = await fetch('/partials/footer.html');
-      footerEl.outerHTML = await r.text();
-    }
-  } catch (e) { console.warn('Footer failed to load', e); }
+  await loadPartial('site-header', '/partials/header.html');
+  await loadPartial('site-footer', '/partials/footer.html');
   updateCartBadge();
   restoreSessionUI();
 }
