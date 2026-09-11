@@ -56,30 +56,29 @@ function renderInventory(){
     html+=`<div class="empty"><div class="empty-i">📦</div><p>No products match.</p></div>`;
   }else{
     html+=`<div class="table-wrap"><table><thead><tr>
-      <th class="frz c1">Product Name</th><th class="frz c2">SKU</th><th class="frz c3">Variant</th>
-      <th>Category</th><th>Location</th><th>Unit Cost</th><th>Price (Direct)</th><th>Price (Shopee)</th>
-      <th>Stock</th><th>Sellable</th><th>Supplier</th><th>Notes</th><th>Actions</th>
+      <th class="frz c1">Product Name</th><th class="frz c2">Stock</th><th class="frz c3">Actions</th>
+      <th>SKU</th><th>Category</th><th>Location</th><th>Unit Cost</th><th>Price (Direct)</th><th>Price (Shopee)</th>
+      <th>Sellable</th><th>Supplier</th><th>Notes</th>
     </tr></thead><tbody>`;
     list.forEach(s=>{
       const low=s.current_stock<=s.low_stock_threshold;
       html+=`<tr>
-        <td class="frz c1"><strong>${s.product_name}</strong></td>
-        <td class="frz c2">${s.sku_code}</td>
-        <td class="frz c3">${s.variant||'—'}</td>
+        <td class="frz c1"><strong>${s.product_name}</strong>${s.variant?`<br><span class="t-muted" style="font-size:11px">${s.variant}</span>`:''}</td>
+        <td class="frz c2 ${low?'stock-low':'stock-ok'}">${s.current_stock}${low?' ⚠':''}</td>
+        <td class="frz c3"><div class="act-btns">
+          <button class="btn btn-p btn-sm" onclick="openNewProductModal('${s.id}')">✎ Edit</button>
+          <button class="btn btn-o btn-sm" onclick="openAdjustmentModal('${s.id}')">±</button>
+          <button class="btn btn-t btn-sm" onclick="openCutModal('${s.id}')">✂ Cut</button>
+        </div></td>
+        <td>${s.sku_code}</td>
         <td>${s.categories?s.categories.name:'<span class="t-muted">Unassigned</span>'}</td>
         <td><span class="pill-tiny ${s.location==='studio'?'pill-studio':'pill-warehouse'}">${s.location}</span></td>
         <td>${P(s.unit_cost)}</td>
         <td>${s.retail_price_direct!=null?P(s.retail_price_direct):'—'}</td>
         <td>${s.retail_price_shopee!=null?P(s.retail_price_shopee):'—'}</td>
-        <td class="${low?'stock-low':'stock-ok'}">${s.current_stock}${low?' ⚠':''}</td>
         <td><span class="pill-tiny ${s.is_sellable?'pill-sellable':'pill-hidden'}">${s.is_sellable?'Yes':'No'}</span></td>
         <td>${s.supplier_source||'—'}</td>
         <td style="max-width:160px;white-space:normal">${s.notes||'—'}</td>
-        <td><div class="act-btns">
-          <button class="btn btn-p btn-sm" onclick="openNewProductModal('${s.id}')">✎ Edit</button>
-          <button class="btn btn-o btn-sm" onclick="openAdjustmentModal('${s.id}')">±</button>
-          <button class="btn btn-t btn-sm" onclick="openCutModal('${s.id}')">✂ Cut</button>
-        </div></td>
       </tr>`;
     });
     html+=`</tbody></table></div>`;
