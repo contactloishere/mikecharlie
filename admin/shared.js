@@ -205,6 +205,7 @@ async function initInventoryData(){
     ]);
     S.skus=skus;S.categories=cats;
     const npCat=$('np-category');
+    npCat.innerHTML='<option value="">— None yet —</option>';
     cats.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name;npCat.appendChild(o);});
     renderInventory();
   }catch(e){
