@@ -323,6 +323,12 @@ async function saveVariant(key){
     is_sellable:!!(priceDirect||priceShopee)
   };
   const photoUrl=$('v-photo-'+key).value.trim();
+  const hasRecipe=$('v-hasrecipe-'+key).checked;
+  const yieldQty=hasRecipe?(parseInt($('v-yield-'+key).value)||1):1;
+  const recipeRowEls=hasRecipe?[...document.querySelectorAll('#v-recipe-rows-'+key+' .recipe-row')].map(row=>({
+    rawId: row.querySelector('.raw-sel').value,
+    rawQty: parseInt(row.querySelector('.raw-qty').value)||1
+  })):[];
 
   try{
     let savedId;
@@ -338,15 +344,10 @@ async function saveVariant(key){
     await upsertVariantPhoto(savedId,photoUrl);
     v.photo_url=photoUrl;
 
-    const hasRecipe=$('v-hasrecipe-'+key).checked;
     await sbDelete('product_recipes',`finished_sku_id=eq.${savedId}`);
     let newRecipeRows=[];
     if(hasRecipe){
-      const yieldQty=parseInt($('v-yield-'+key).value)||1;
-      const rows=[...document.querySelectorAll('#v-recipe-rows-'+key+' .recipe-row')];
-      for(const row of rows){
-        const rawId=row.querySelector('.raw-sel').value;
-        const rawQty=parseInt(row.querySelector('.raw-qty').value)||1;
+      for(const {rawId,rawQty} of recipeRowEls){
         if(rawId){
           await sbInsert('product_recipes',{finished_sku_id:savedId,raw_material_sku_id:rawId,yield_qty:yieldQty,raw_qty_consumed:rawQty});
           newRecipeRows.push({raw_material_sku_id:rawId,yield_qty:yieldQty,raw_qty_consumed:rawQty});
