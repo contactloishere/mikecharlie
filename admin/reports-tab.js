@@ -1,191 +1,443 @@
 /* ─────────────────────────────────────────────────────────
-   DATA REPORTS TAB
-   Chart helpers, computeReports(), renderDataReports().
+   PRODUCTS TAB
+   Listings, variants, photos, recipes.
    ───────────────────────────────────────────────────────── */
 
 /* ═══════════════════════════════════════════════════════════════════════
-   DATA REPORTS TAB
+   PRODUCTS TAB — Listings, Variants, Photos, Recipes — all in one place
    ═══════════════════════════════════════════════════════════════════════ */
-let chartJsLoaded=false;
-const chartInstances={};
-function loadChartJs(){
-  return new Promise((resolve,reject)=>{
-    if(chartJsLoaded && window.Chart){resolve();return;}
-    const script=document.createElement('script');
-    script.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js';
-    script.onload=()=>{chartJsLoaded=true;resolve();};
-    script.onerror=()=>reject(new Error('Chart library failed to load'));
-    document.head.appendChild(script);
-  });
-}
-function killChart(id){
-  if(chartInstances[id]){chartInstances[id].destroy();delete chartInstances[id];}
-}
-function makeBarChart(id,labels,data,horizontal){
-  killChart(id);
-  const ctx=document.getElementById(id);
-  if(!ctx)return;
-  chartInstances[id]=new Chart(ctx,{
-    type:'bar',
-    data:{labels,datasets:[{data,backgroundColor:'#729A94',borderRadius:4}]},
-    options:{
-      indexAxis:horizontal?'y':'x',
-      plugins:{legend:{display:false}},
-      scales:{x:{grid:{display:!horizontal}},y:{grid:{display:horizontal}}}
-    }
-  });
-}
-function makeLineChart(id,labels,datasets){
-  killChart(id);
-  const ctx=document.getElementById(id);
-  if(!ctx)return;
-  chartInstances[id]=new Chart(ctx,{
-    type:'line',
-    data:{labels,datasets:datasets.map(d=>({...d,tension:.3,fill:false}))},
-    options:{plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true}}}
-  });
-}
-
-function monthKey(dateStr){const d=new Date(dateStr);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
-function monthLabel(key){const [y,m]=key.split('-');return new Date(y,m-1,1).toLocaleDateString('en-PH',{month:'short',year:'2-digit'});}
-
-function computeReports(sales){
-  const now=new Date();
-  const moStart=startOfMonth(now);
-  const inMonth=sales.filter(s=>new Date(s.sale_date)>=moStart);
-  const grossMonth=inMonth.reduce((s,x)=>s+parseFloat(x.total_amount||0),0);
-  const netMonth=inMonth.reduce((s,x)=>s+parseFloat(x.net_profit||0),0);
-  const platformFeeMonth=inMonth.reduce((s,x)=>s+parseFloat(x.platform_fee||0),0);
-  const aov = inMonth.length ? grossMonth/inMonth.length : 0;
-  const feePct = grossMonth ? (platformFeeMonth/grossMonth*100) : 0;
-
-  // 6-month trend
-  const months=[];
-  for(let i=5;i>=0;i--){
-    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
-    months.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));
-  }
-  const grossByMonth={},netByMonth={};
-  months.forEach(m=>{grossByMonth[m]=0;netByMonth[m]=0;});
-  sales.forEach(s=>{
-    const k=monthKey(s.sale_date);
-    if(k in grossByMonth){grossByMonth[k]+=parseFloat(s.total_amount||0);netByMonth[k]+=parseFloat(s.net_profit||0);}
-  });
-
-  // top sellers / slow movers (all-time, by units sold)
-  const soldMap={};
-  sales.forEach(sale=>(sale.sale_items||[]).forEach(item=>{
-    const key=item.sku_id;
-    if(!soldMap[key])soldMap[key]={label:(item.skus?item.skus.product_name+(item.skus.variant?' — '+item.skus.variant:''):'Unknown'),qty:0};
-    soldMap[key].qty+=item.quantity;
-  }));
-  const topSellers=Object.values(soldMap).sort((a,b)=>b.qty-a.qty).slice(0,5);
-  const slowMovers=S.skus
-    .filter(s=>s.is_sellable && s.is_active && s.current_stock>0)
-    .map(s=>({label:s.product_name+(s.variant?' — '+s.variant:''), qty:(soldMap[s.id]?soldMap[s.id].qty:0)}))
-    .sort((a,b)=>a.qty-b.qty).slice(0,5);
-
-  // payment method breakdown
-  const payMap={};
-  sales.forEach(s=>{const k=s.payment_method||'Unspecified';payMap[k]=(payMap[k]||0)+parseFloat(s.total_amount||0);});
-  const paymentBreakdown=Object.entries(payMap).sort((a,b)=>b[1]-a[1]);
-
-  // top cities
-  const cityMap={};
-  sales.forEach(s=>{if(s.city_province){cityMap[s.city_province]=(cityMap[s.city_province]||0)+parseFloat(s.total_amount||0);}});
-  const topCities=Object.entries(cityMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
-
-  // top recurring customers
-  const custMap={};
-  sales.forEach(s=>{
-    if(!s.customer_name)return;
-    const key=s.customer_name.trim().toLowerCase();
-    if(!custMap[key])custMap[key]={name:s.customer_name.trim(),count:0,total:0,last:s.sale_date};
-    custMap[key].count++;
-    custMap[key].total+=parseFloat(s.total_amount||0);
-    if(new Date(s.sale_date)>new Date(custMap[key].last))custMap[key].last=s.sale_date;
-  });
-  const topCustomers=Object.values(custMap).sort((a,b)=>b.count-a.count||b.total-a.total).slice(0,5);
-  const distinctCustomers=Object.keys(custMap).length;
-  const repeatCustomers=Object.values(custMap).filter(c=>c.count>1).length;
-  const repeatRate = distinctCustomers ? (repeatCustomers/distinctCustomers*100) : 0;
-
-  // days of inventory remaining (based on last 30 days velocity)
-  const thirtyAgo=new Date(now);thirtyAgo.setDate(thirtyAgo.getDate()-30);
-  const recentSoldMap={};
-  sales.filter(s=>new Date(s.sale_date)>=thirtyAgo).forEach(sale=>(sale.sale_items||[]).forEach(item=>{
-    recentSoldMap[item.sku_id]=(recentSoldMap[item.sku_id]||0)+item.quantity;
-  }));
-  const runwayList=S.skus
-    .filter(s=>s.is_sellable && s.is_active && recentSoldMap[s.id])
-    .map(s=>{
-      const dailyRate=recentSoldMap[s.id]/30;
-      return {label:s.product_name+(s.variant?' — '+s.variant:''), stock:s.current_stock, days: dailyRate>0?Math.round(s.current_stock/dailyRate):null};
-    })
-    .filter(x=>x.days!=null)
-    .sort((a,b)=>a.days-b.days).slice(0,6);
-
-  return {grossMonth,netMonth,aov,feePct,months,grossByMonth,netByMonth,topSellers,slowMovers,paymentBreakdown,topCities,topCustomers,repeatRate,distinctCustomers,runwayList};
-}
-
-async function renderDataReports(){
+async function renderProducts(){
   $('body').innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:40vh;color:var(--text-muted)">
     <div style="width:32px;height:32px;border:3px solid var(--sand);border-top-color:var(--teal);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:1rem"></div>
-    <p>Loading reports...</p></div>`;
+    <p>Loading products...</p></div>`;
   try{
-    const [sales]=await Promise.all([fetchSalesData(), loadChartJs()]);
-    const r=computeReports(sales);
-
-    let html=`
-    <div class="stat-strip">
-      <div class="stat-box"><div class="stat-num">${P(r.grossMonth)}</div><div class="stat-lbl">Gross Sales (Month)</div></div>
-      <div class="stat-box"><div class="stat-num">${P(r.netMonth)}</div><div class="stat-lbl">Net Sales (Month)</div></div>
-      <div class="stat-box"><div class="stat-num">${P(r.aov)}</div><div class="stat-lbl">Avg Order Value</div></div>
-      <div class="stat-box"><div class="stat-num">${r.feePct.toFixed(1)}%</div><div class="stat-lbl">Platform Fee of Revenue</div></div>
-      <div class="stat-box"><div class="stat-num">${r.repeatRate.toFixed(0)}%</div><div class="stat-lbl">Repeat Customer Rate</div></div>
-    </div>
-
-    <div class="card"><div class="card-title">📈 Gross vs. Net Sales — Last 6 Months</div>
-      <canvas id="chart-trend" height="90"></canvas></div>
-
-    <div class="card"><div class="card-title">🏆 Top 5 Best-Selling Items</div>
-      ${r.topSellers.length?'<canvas id="chart-topsellers" height="120"></canvas>':'<p class="t-muted" style="font-size:13px">No sales recorded yet.</p>'}</div>
-
-    <div class="card"><div class="card-title">🐌 Top 5 Slow-Moving Items <span class="t-muted" style="font-size:11px;font-weight:400">(in stock, fewest units sold all-time)</span></div>
-      ${r.slowMovers.length?'<canvas id="chart-slowmovers" height="120"></canvas>':'<p class="t-muted" style="font-size:13px">No data yet.</p>'}</div>
-
-    <div class="card"><div class="card-title">💳 Payment Method Breakdown</div>
-      ${r.paymentBreakdown.length?'<canvas id="chart-paymethod" height="120"></canvas>':'<p class="t-muted" style="font-size:13px">No sales recorded yet.</p>'}</div>
-
-    <div class="card"><div class="card-title">📍 Top 5 Cities/Provinces</div>
-      ${r.topCities.length?'<canvas id="chart-cities" height="120"></canvas>':'<p class="t-muted" style="font-size:13px">No location data yet.</p>'}</div>
-
-    <div class="card"><div class="card-title">👤 Top 5 Recurring Direct Customers</div>
-      ${r.topCustomers.length?`<div class="table-wrap"><table><thead><tr><th>Customer</th><th>Orders</th><th>Total Spent</th><th>Last Order</th></tr></thead><tbody>
-        ${r.topCustomers.map(c=>`<tr><td>${c.name}</td><td>${c.count}</td><td>${P(c.total)}</td><td>${fmtDate(c.last)}</td></tr>`).join('')}
-      </tbody></table></div>`:'<p class="t-muted" style="font-size:13px">No customer data yet.</p>'}
-    </div>
-
-    <div class="card"><div class="card-title">⏳ Inventory Running Low Fastest <span class="t-muted" style="font-size:11px;font-weight:400">(based on last 30 days of sales)</span></div>
-      ${r.runwayList.length?`<div class="table-wrap"><table><thead><tr><th>Item</th><th>Current Stock</th><th>Est. Days Remaining</th></tr></thead><tbody>
-        ${r.runwayList.map(x=>`<tr><td>${x.label}</td><td>${x.stock}</td><td class="${x.days<=7?'stock-low':''}">${x.days} days</td></tr>`).join('')}
-      </tbody></table></div>`:'<p class="t-muted" style="font-size:13px">Not enough recent sales history yet to estimate.</p>'}
-    </div>
-
-    <p class="t-muted" style="font-size:11px;text-align:center;margin-top:8px">Hotel orders and shipping/courier reports aren't wired in yet — these reports reflect direct/storefront sales only.</p>`;
-
-    $('body').innerHTML=html;
-
-    // Draw charts now that canvases exist in the DOM
-    makeLineChart('chart-trend', r.months.map(monthLabel), [
-      {label:'Gross',data:r.months.map(m=>r.grossByMonth[m]),borderColor:'#3E5F5C',backgroundColor:'#3E5F5C'},
-      {label:'Net',data:r.months.map(m=>r.netByMonth[m]),borderColor:'#D1A679',backgroundColor:'#D1A679'}
+    const [listings,skus,photos,recipes,cats]=await Promise.all([
+      sbGet('product_listings','select=*'),
+      sbGet('skus','select=*,categories(id,name)&order=product_name.asc'),
+      sbGet('variant_photos','select=sku_id,photo_url'),
+      sbGet('product_recipes','select=*'),
+      sbGet('categories','select=*&order=display_order.asc')
     ]);
-    if(r.topSellers.length)makeBarChart('chart-topsellers', r.topSellers.map(x=>x.label), r.topSellers.map(x=>x.qty), true);
-    if(r.slowMovers.length)makeBarChart('chart-slowmovers', r.slowMovers.map(x=>x.label), r.slowMovers.map(x=>x.qty), true);
-    if(r.paymentBreakdown.length)makeBarChart('chart-paymethod', r.paymentBreakdown.map(x=>x[0]), r.paymentBreakdown.map(x=>x[1]), true);
-    if(r.topCities.length)makeBarChart('chart-cities', r.topCities.map(x=>x[0]), r.topCities.map(x=>x[1]), true);
+    PS.listings=listings;PS.allSkus=skus;PS.categories=cats;PS.recipesAll=recipes;
+    PS.photoMap={};photos.forEach(p=>{if(p.photo_url)PS.photoMap[p.sku_id]=p.photo_url;});
+    renderProductsList();
   }catch(e){
-    $('body').innerHTML=`<div class="empty"><div class="empty-i">⚠️</div><p>Couldn't load reports.<br><span class="t-muted" style="font-size:12px">${e.message}</span></p></div>`;
+    $('body').innerHTML=`<div class="empty"><div class="empty-i">⚠️</div><p>Couldn't load products.<br><span class="t-muted" style="font-size:12px">${e.message}</span></p></div>`;
   }
+}
+
+function renderProductsList(){
+  const map={};
+  PS.allSkus.forEach(s=>{
+    if(!map[s.product_name])map[s.product_name]=[];
+    map[s.product_name].push(s);
+  });
+  PS.groups=Object.entries(map);
+  let html=`<div class="card"><div class="card-title">🗂️ All Products</div>
+    <p class="t-muted" style="font-size:13px;margin-bottom:12px">Everything here — photos, descriptions, prices, stock, recipes — is editable right from this screen. Supabase stays untouched from here on.</p>
+    <button class="btn btn-p btn-sm" onclick="openNewListingModal()">+ New Product</button>
+  </div>`;
+  if(!PS.groups.length){
+    html+=`<div class="empty"><div class="empty-i">🗂️</div><p>No products yet.</p></div>`;
+  }else{
+    html+=`<div class="listing-grid">`;
+    PS.groups.forEach(([title,arr],idx)=>{
+      const listing=PS.listings.find(l=>l.title===title);
+      const thumb=listing&&listing.cover_image_url;
+      const inactiveCount=arr.filter(s=>!s.is_active).length;
+      html+=`<div class="listing-card" onclick="openListingDetail(${idx})">
+        <div class="listing-thumb">${thumb?`<img src="${attrEsc(thumb)}">`:'🌿'}</div>
+        <div class="listing-info">
+          <div class="listing-title">${title}</div>
+          <div class="listing-meta">${arr.length} variant${arr.length!==1?'s':''}${inactiveCount?' · '+inactiveCount+' inactive':''}</div>
+        </div>
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+  $('body').innerHTML=html;
+}
+
+function openNewListingModal(){
+  $('nl-title').value='';
+  openModal('newlisting-modal');
+}
+async function submitNewListing(){
+  const title=$('nl-title').value.trim();
+  if(!title){toast('Enter a title.');return;}
+  if(PS.listings.some(l=>l.title===title)){toast('A listing with that title already exists.');return;}
+  try{
+    const saved=await sbInsert('product_listings',{title});
+    PS.listings.push(saved[0]);
+    toast('✓ Listing created — now add your first variant.');
+    closeModal('newlisting-modal');
+    PS.currentTitle=title;
+    PS.currentListing=saved[0];
+    PS.variants=[];
+    PS.sharedSettings=defaultSharedSettings();
+    PS.expandedId=null;
+    PS.newVariantCounter=0;
+    renderListingDetail();
+  }catch(e){toast('Error: '+e.message);}
+}
+
+function defaultSharedSettings(){
+  return {category_id:null,location:'studio',unit_cost:0,is_on_sale:false,sale_price:null,ribbon_text:null,low_stock_threshold:5};
+}
+function deriveSharedSettings(variants){
+  if(!variants.length)return defaultSharedSettings();
+  const first=variants[0];
+  return {
+    category_id:first.category_id||null,
+    location:first.location||'studio',
+    unit_cost:first.unit_cost||0,
+    is_on_sale:!!first.is_on_sale,
+    sale_price:first.sale_price!=null?first.sale_price:null,
+    ribbon_text:first.ribbon_text||null,
+    low_stock_threshold:first.low_stock_threshold||5
+  };
+}
+
+function blankListing(title){
+  return {title,cover_image_url:'',image_1:'',image_2:'',image_3:'',image_4:'',image_5:'',
+    image_6:'',image_7:'',image_8:'',image_9:'',short_description:'',long_description:'',
+    subsection_1_title:'',subsection_1_body:'',subsection_2_title:'',subsection_2_body:'',
+    subsection_3_title:'',subsection_3_body:'',subsection_4_title:'',subsection_4_body:''};
+}
+
+function openListingDetail(idx){
+  const [title,skusArr]=PS.groups[idx];
+  PS.currentTitle=title;
+  PS.currentListing=PS.listings.find(l=>l.title===title)||blankListing(title);
+  PS.variants=skusArr.map(s=>({
+    ...s,
+    photo_url:PS.photoMap[s.id]||'',
+    _recipeRows:PS.recipesAll.filter(r=>r.finished_sku_id===s.id),
+    _isNew:false
+  }));
+  PS.sharedSettings=deriveSharedSettings(PS.variants);
+  PS.expandedId=null;
+  PS.newVariantCounter=0;
+  renderListingDetail();
+}
+
+function renderListingDetail(){
+  const l=PS.currentListing;
+  let html=`<button class="pl-back" onclick="renderProductsList()">← Back to Products</button>`;
+  html+=`<div class="card">
+    <div class="card-title">📝 Listing Content</div>
+    <label class="lbl">Title</label>
+    <input class="inp" id="pl-title" value="${attrEsc(l.title)}">
+    <p class="t-muted" style="font-size:11px;margin:-8px 0 12px">Renaming this updates all ${PS.variants.length} variant(s) under it automatically.</p>
+    <label class="lbl">Cover Photo URL</label>
+    <input class="inp" id="pl-cover" value="${attrEsc(l.cover_image_url)}" placeholder="Paste a photo URL">
+    <label class="lbl">Additional Photos (up to 9)</label>
+    <div class="photo-grid" style="margin-bottom:12px">
+      ${[1,2,3,4,5,6,7,8,9].map(n=>`<input class="inp" id="pl-image-${n}" placeholder="Photo ${n} URL" value="${attrEsc(l['image_'+n])}">`).join('')}
+    </div>
+    <label class="lbl">Short Description <span class="t-muted">(shown on the shop grid card)</span></label>
+    <textarea class="inp" id="pl-short">${l.short_description||''}</textarea>
+    <label class="lbl">Long Description <span class="t-muted">(shown on the product page)</span></label>
+    <textarea class="inp" id="pl-long" rows="4">${l.long_description||''}</textarea>
+    ${[1,2,3,4].map(n=>`
+      <label class="lbl">Subsection ${n} Title</label>
+      <input class="inp" id="pl-sub${n}-title" value="${attrEsc(l['subsection_'+n+'_title'])}" placeholder="e.g. Use and Care">
+      <label class="lbl">Subsection ${n} Body</label>
+      <textarea class="inp" id="pl-sub${n}-body">${l['subsection_'+n+'_body']||''}</textarea>
+    `).join('')}
+    <button class="btn btn-p" onclick="saveListingContent()">Save Listing Content</button>
+  </div>`;
+
+  html+=sharedSettingsCardHtml();
+
+  html+=`<div class="card"><div class="card-title">🎨 Variants (${PS.variants.length})</div>`;
+  PS.variants.forEach(v=>{html+=variantAccordionHtml(v);});
+  html+=`<button class="btn btn-g btn-block" onclick="addNewVariant()">+ Add Variant</button></div>`;
+
+  $('body').innerHTML=html;
+}
+
+function sharedSettingsCardHtml(){
+  const s=PS.sharedSettings;
+  const cats=PS.categories||[];
+  return `<div class="card">
+    <div class="card-title">⚙️ Shared Settings <span class="t-muted" style="font-size:11px;font-weight:400">(one edit applies to every variant under this product)</span></div>
+    <div class="field-row field-row-2">
+      <div><label class="lbl">Category</label>
+        <select class="inp" id="ls-cat"><option value="">— None —</option>
+          ${cats.map(c=>`<option value="${c.id}" ${s.category_id===c.id?'selected':''}>${c.name}</option>`).join('')}
+        </select></div>
+      <div><label class="lbl">Location</label>
+        <select class="inp" id="ls-loc">
+          <option value="studio" ${s.location==='studio'?'selected':''}>Studio</option>
+          <option value="warehouse" ${s.location==='warehouse'?'selected':''}>Warehouse</option>
+        </select></div>
+    </div>
+    <div class="field-row field-row-2">
+      <div><label class="lbl">Unit Cost (₱)</label><input class="inp" type="number" step="0.01" id="ls-cost" value="${s.unit_cost||0}"></div>
+      <div><label class="lbl">Low Stock Threshold</label><input class="inp" type="number" id="ls-threshold" value="${s.low_stock_threshold||5}"></div>
+    </div>
+    <div class="check-row"><input type="checkbox" id="ls-onsale" ${s.is_on_sale?'checked':''}><label for="ls-onsale">On Sale</label></div>
+    <label class="lbl">Sale Price (₱)</label>
+    <input class="inp" type="number" step="0.01" id="ls-saleprice" value="${s.sale_price!=null?s.sale_price:''}">
+    <label class="lbl">Ribbon Text</label>
+    <input class="inp" id="ls-ribbon" value="${attrEsc(s.ribbon_text)}" placeholder="e.g. Bestseller, New Arrival">
+    <button class="btn btn-p" id="ls-save-btn" style="margin-top:12px" onclick="saveSharedSettings()">Save Shared Settings</button>
+    <p class="t-muted" style="font-size:11px;margin-top:8px">${PS.variants.filter(v=>!v._isNew).length} existing variant(s) will be updated. Any variant you add afterward starts with these values too.</p>
+  </div>`;
+}
+
+async function saveSharedSettings(){
+  const salePrice=$('ls-saleprice').value;
+  const payload={
+    category_id:$('ls-cat').value||null,
+    location:$('ls-loc').value,
+    unit_cost:parseFloat($('ls-cost').value)||0,
+    is_on_sale:$('ls-onsale').checked,
+    sale_price:salePrice?parseFloat(salePrice):null,
+    ribbon_text:$('ls-ribbon').value.trim()||null,
+    low_stock_threshold:parseInt($('ls-threshold').value)||5
+  };
+  const btn=$('ls-save-btn');
+  const orig=btn?btn.textContent:null;
+  if(btn){btn.textContent='Saving...';btn.disabled=true;}
+  try{
+    const existing=PS.variants.filter(v=>!v._isNew);
+    if(existing.length){
+      const r=await fetch(`${SB_URL}/rest/v1/skus?product_name=eq.${encodeURIComponent(PS.currentTitle)}`,{
+        method:'PATCH',headers:authHeaders({'Content-Type':'application/json'}),
+        body:JSON.stringify(payload)
+      });
+      if(!r.ok)throw new Error(await r.text());
+    }
+    PS.sharedSettings=payload;
+    PS.variants.forEach(v=>Object.assign(v,payload));
+    if(PS.allSkus){PS.allSkus.forEach(s=>{if(s.product_name===PS.currentTitle)Object.assign(s,payload);});}
+    toast('✓ Shared settings saved for all variants!');
+    renderListingDetail();
+  }catch(e){toast('Error: '+e.message);}
+  finally{if(btn){btn.textContent=orig;btn.disabled=false;}}
+}
+
+function variantAccordionHtml(v){
+  const key=v.id||v._tempId;
+  const open=PS.expandedId===key;
+  const low=v.current_stock<=v.low_stock_threshold;
+  return `<div class="variant-acc">
+    <div class="variant-acc-hdr" onclick="toggleVariantAcc('${key}')">
+      <div>
+        <div class="variant-acc-title">${v.variant||v.sku_code||'(unsaved variant)'}${v._isNew?' <span class="t-muted">(new)</span>':''}${v.is_active===false?' <span class="t-muted">(inactive)</span>':''}</div>
+        <div class="variant-acc-sub">${v.sku_code||'no SKU yet'} · ${v.retail_price_direct!=null?P(v.retail_price_direct):'no price'} · Stock: <span class="${low?'stock-low':''}">${v.current_stock}</span></div>
+      </div>
+      <span class="variant-acc-arrow ${open?'open':''}">▼</span>
+    </div>
+    <div class="variant-acc-body ${open?'open':''}" id="vbody-${key}">
+      ${open?variantFormHtml(v,key):''}
+    </div>
+  </div>`;
+}
+
+function recipeRowHtml(key,ri,row){
+  const rawOptions=PS.allSkus.map(s=>`<option value="${s.id}" ${row&&row.raw_material_sku_id===s.id?'selected':''}>${s.sku_code} — ${s.product_name}${s.variant?' ('+s.variant+')':''}</option>`).join('');
+  return `<div class="recipe-row" id="v-recipe-row-${key}-${ri}">
+    <div><label class="lbl">Raw Material</label><select class="inp raw-sel"><option value="">Select...</option>${rawOptions}</select></div>
+    <div><label class="lbl">Qty Used</label><input class="inp raw-qty" type="number" value="${row?row.raw_qty_consumed:1}" min="1"></div>
+    <button class="rm-btn" type="button" onclick="document.getElementById('v-recipe-row-${key}-${ri}').remove()">✕</button>
+  </div>`;
+}
+
+function variantFormHtml(v,key){
+  const hasRecipe=v._recipeRows&&v._recipeRows.length>0;
+  return `
+    <label class="lbl">Variant Name</label>
+    <input class="inp" id="v-variant-${key}" value="${attrEsc(v.variant)}">
+    <label class="lbl">SKU Code ${v._isNew?'*':''}</label>
+    <input class="inp" id="v-sku-${key}" value="${attrEsc(v.sku_code)}" ${v._isNew?'':'readonly style="background:var(--pearl)"'}>
+    <label class="lbl">Current Stock</label>
+    <input class="inp" type="number" id="v-stock-${key}" value="${v.current_stock||0}">
+    <p class="t-muted" style="font-size:11px;margin:-4px 0 12px">Category, Location, Unit Cost, On Sale, Sale Price, Ribbon Text, and Low Stock Threshold are shared across all variants — edit them once in Shared Settings above.</p>
+    <div class="field-row field-row-2">
+      <div><label class="lbl">Price – Direct (₱)</label><input class="inp" type="number" step="0.01" id="v-pricedirect-${key}" value="${v.retail_price_direct!=null?v.retail_price_direct:''}"></div>
+      <div><label class="lbl">Price – Shopee (₱)</label><input class="inp" type="number" step="0.01" id="v-priceshopee-${key}" value="${v.retail_price_shopee!=null?v.retail_price_shopee:''}"></div>
+    </div>
+    <label class="lbl">Photo URL <span class="t-muted">(this specific variant)</span></label>
+    <input class="inp" id="v-photo-${key}" value="${attrEsc(v.photo_url)}" placeholder="Paste a photo URL">
+    <label class="lbl">Supplier/Source</label>
+    <input class="inp" id="v-supplier-${key}" value="${attrEsc(v.supplier_source)}">
+    <label class="lbl">Notes</label>
+    <textarea class="inp" id="v-notes-${key}">${v.notes||''}</textarea>
+    <div class="check-row"><input type="checkbox" id="v-active-${key}" ${v.is_active!==false?'checked':''}><label for="v-active-${key}">Active</label></div>
+
+    <div class="check-row"><input type="checkbox" id="v-hasrecipe-${key}" onchange="toggleVariantRecipe('${key}')" ${hasRecipe?'checked':''}><label for="v-hasrecipe-${key}">This variant is cut/assembled from raw materials</label></div>
+    <div id="v-recipe-section-${key}" style="display:${hasRecipe?'block':'none'}">
+      <label class="lbl">Yield Quantity <span class="t-muted">(units produced per cut/assembly)</span></label>
+      <input class="inp" type="number" id="v-yield-${key}" value="${hasRecipe?v._recipeRows[0].yield_qty:1}">
+      <label class="lbl">Raw Materials</label>
+      <div id="v-recipe-rows-${key}">
+        ${(v._recipeRows||[]).map((r,ri)=>recipeRowHtml(key,ri,r)).join('')}
+      </div>
+      <button class="btn btn-o btn-sm" type="button" onclick="addVariantRecipeRow('${key}')">+ Add Raw Material</button>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-p" onclick="saveVariant('${key}')">Save Variant</button>
+      ${!v._isNew?`<button class="btn btn-danger btn-sm" onclick="deactivateVariant('${key}')">Deactivate</button>`:''}
+    </div>
+  `;
+}
+
+function toggleVariantAcc(key){
+  PS.expandedId=PS.expandedId===key?null:key;
+  renderListingDetail();
+}
+function toggleVariantRecipe(key){
+  const checked=$('v-hasrecipe-'+key).checked;
+  $('v-recipe-section-'+key).style.display=checked?'block':'none';
+}
+let recipeRowCounter=0;
+function addVariantRecipeRow(key){
+  recipeRowCounter++;
+  $('v-recipe-rows-'+key).insertAdjacentHTML('beforeend',recipeRowHtml(key,'new'+recipeRowCounter,null));
+}
+function addNewVariant(){
+  PS.newVariantCounter++;
+  const tempId='newv'+PS.newVariantCounter;
+  const s=PS.sharedSettings||defaultSharedSettings();
+  PS.variants.push({
+    id:null,_tempId:tempId,_isNew:true,product_name:PS.currentTitle,
+    sku_code:'',variant:'',category_id:s.category_id,location:s.location,unit_cost:s.unit_cost,
+    current_stock:0,retail_price_direct:null,retail_price_shopee:null,
+    is_on_sale:s.is_on_sale,sale_price:s.sale_price,ribbon_text:s.ribbon_text,low_stock_threshold:s.low_stock_threshold,
+    supplier_source:null,notes:null,is_active:true,photo_url:'',_recipeRows:[]
+  });
+  PS.expandedId=tempId;
+  renderListingDetail();
+}
+
+async function saveListingContent(){
+  const oldTitle=PS.currentTitle;
+  const newTitle=$('pl-title').value.trim();
+  if(!newTitle){toast('Title is required.');return;}
+  const payload={
+    title:newTitle,
+    cover_image_url:$('pl-cover').value.trim()||null,
+    short_description:$('pl-short').value.trim()||null,
+    long_description:$('pl-long').value.trim()||null,
+  };
+  for(let n=1;n<=9;n++)payload['image_'+n]=$('pl-image-'+n).value.trim()||null;
+  for(let n=1;n<=4;n++){
+    payload['subsection_'+n+'_title']=$('pl-sub'+n+'-title').value.trim()||null;
+    payload['subsection_'+n+'_body']=$('pl-sub'+n+'-body').value.trim()||null;
+  }
+  try{
+    if(PS.currentListing.id){
+      await sbUpdate('product_listings',PS.currentListing.id,payload);
+    }else{
+      const saved=await sbInsert('product_listings',payload);
+      PS.currentListing=saved[0];
+    }
+    if(newTitle!==oldTitle){
+      const r=await fetch(`${SB_URL}/rest/v1/skus?product_name=eq.${encodeURIComponent(oldTitle)}`,{
+        method:'PATCH',headers:authHeaders({'Content-Type':'application/json'}),
+        body:JSON.stringify({product_name:newTitle})
+      });
+      if(!r.ok)throw new Error('Renamed listing, but updating linked variants failed — check Supabase.');
+      PS.currentTitle=newTitle;
+      PS.variants.forEach(v=>v.product_name=newTitle);
+    }
+    Object.assign(PS.currentListing,payload);
+    toast('✓ Listing content saved!');
+  }catch(e){toast('Error: '+e.message);}
+}
+
+async function upsertVariantPhoto(skuId,url){
+  const r=await fetch(`${SB_URL}/rest/v1/variant_photos?on_conflict=sku_id`,{
+    method:'POST',
+    headers:authHeaders({'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=representation'}),
+    body:JSON.stringify({sku_id:skuId,photo_url:url||null})
+  });
+  if(!r.ok)throw new Error('Photo save failed: '+(await r.text()));
+}
+
+async function saveVariant(key){
+  const v=PS.variants.find(x=>(x.id||x._tempId)===key);
+  if(!v)return;
+  const skuCode=$('v-sku-'+key).value.trim();
+  if(!skuCode){toast('SKU Code is required.');return;}
+  const priceDirect=$('v-pricedirect-'+key).value;
+  const priceShopee=$('v-priceshopee-'+key).value;
+  const shared=PS.sharedSettings||defaultSharedSettings();
+  const payload={
+    sku_code:skuCode,
+    product_name:PS.currentTitle,
+    variant:$('v-variant-'+key).value.trim()||null,
+    category_id:shared.category_id,
+    location:shared.location,
+    unit_cost:shared.unit_cost,
+    current_stock:parseInt($('v-stock-'+key).value)||0,
+    retail_price_direct:priceDirect?parseFloat(priceDirect):null,
+    retail_price_shopee:priceShopee?parseFloat(priceShopee):null,
+    is_on_sale:shared.is_on_sale,
+    sale_price:shared.sale_price,
+    ribbon_text:shared.ribbon_text,
+    low_stock_threshold:shared.low_stock_threshold,
+    supplier_source:$('v-supplier-'+key).value.trim()||null,
+    notes:$('v-notes-'+key).value.trim()||null,
+    is_active:$('v-active-'+key).checked,
+    is_sellable:!!(priceDirect||priceShopee)
+  };
+  const photoUrl=$('v-photo-'+key).value.trim();
+  const hasRecipe=$('v-hasrecipe-'+key).checked;
+  const yieldQty=hasRecipe?(parseInt($('v-yield-'+key).value)||1):1;
+  const recipeRowEls=hasRecipe?[...document.querySelectorAll('#v-recipe-rows-'+key+' .recipe-row')].map(row=>({
+    rawId: row.querySelector('.raw-sel').value,
+    rawQty: parseInt(row.querySelector('.raw-qty').value)||1
+  })):[];
+
+  try{
+    let savedId;
+    if(v._isNew){
+      const saved=await sbInsert('skus',payload);
+      savedId=saved[0].id;
+    }else{
+      await sbUpdate('skus',v.id,payload);
+      savedId=v.id;
+    }
+    Object.assign(v,payload,{id:savedId,_isNew:false});
+
+    await upsertVariantPhoto(savedId,photoUrl);
+    v.photo_url=photoUrl;
+
+    await sbDelete('product_recipes',`finished_sku_id=eq.${savedId}`);
+    let newRecipeRows=[];
+    if(hasRecipe){
+      for(const {rawId,rawQty} of recipeRowEls){
+        if(rawId){
+          await sbInsert('product_recipes',{finished_sku_id:savedId,raw_material_sku_id:rawId,yield_qty:yieldQty,raw_qty_consumed:rawQty});
+          newRecipeRows.push({raw_material_sku_id:rawId,yield_qty:yieldQty,raw_qty_consumed:rawQty});
+        }
+      }
+    }
+    v._recipeRows=newRecipeRows;
+
+    // Refresh the master lists so other variants' raw-material pickers see this one too
+    if(!PS.allSkus.find(s=>s.id===savedId))PS.allSkus.push({...v});
+
+    toast('✓ Variant saved!');
+    renderListingDetail();
+  }catch(e){
+    toast('Error: '+e.message);
+  }
+}
+
+async function deactivateVariant(key){
+  const v=PS.variants.find(x=>(x.id||x._tempId)===key);
+  if(!v||!v.id)return;
+  if(!confirm('Deactivate this variant? It disappears from the shop but stays in your records.'))return;
+  try{
+    await sbUpdate('skus',v.id,{is_active:false,is_sellable:false});
+    v.is_active=false;v.is_sellable=false;
+    toast('✓ Deactivated.');
+    renderListingDetail();
+  }catch(e){toast('Error: '+e.message);}
 }
