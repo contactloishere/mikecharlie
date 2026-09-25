@@ -5,6 +5,7 @@
       <div class="hdr-nav-links">
         <a href="/" data-nav="shop">Shop</a>
         <a href="/hotel-partner-program" data-nav="hotel-partner-program">Hotel Partner Program</a>
+        <a href="/?category=preloved" data-nav="preloved">Preloved Clearance Sale</a>
       </div>
     </div>
     <div class="hdr-actions">
@@ -19,6 +20,7 @@
   <button class="mobile-nav-close" onclick="closeMobileNav()">✕</button>
   <a href="/">Shop</a>
   <a href="/hotel-partner-program">Hotel Partner Program</a>
+  <a href="/?category=preloved">Preloved Clearance Sale</a>
   <button class="mnav-item" onclick="closeMobileNav();openAuthModal()">Log In / Sign Up</button>
 </div>
 
@@ -26,10 +28,13 @@
 // Highlight the current page's nav link once the header is injected
 (function(){
   const path = window.location.pathname.replace(/\/$/, '') || '/';
+  const params = new URLSearchParams(window.location.search);
+  const isPreloved = (path === '' || path === '/') && params.get('category') === 'preloved';
   document.querySelectorAll('.hdr-nav-links a').forEach(a=>{
-    const isShop = a.dataset.nav === 'shop' && (path === '' || path === '/');
+    const isShop = a.dataset.nav === 'shop' && (path === '' || path === '/') && !isPreloved;
     const isHotel = a.dataset.nav === 'hotel-partner-program' && path.includes('hotel-partner-program');
-    if (isShop || isHotel) {
+    const isPrelovedLink = a.dataset.nav === 'preloved' && isPreloved;
+    if (isShop || isHotel || isPrelovedLink) {
       a.style.color = 'var(--lagoon)';
       a.style.fontWeight = '600';
     } else {
