@@ -74,10 +74,28 @@ async function submitNewListing(){
     PS.currentTitle=title;
     PS.currentListing=saved[0];
     PS.variants=[];
+    PS.sharedSettings=defaultSharedSettings();
     PS.expandedId=null;
     PS.newVariantCounter=0;
     renderListingDetail();
   }catch(e){toast('Error: '+e.message);}
+}
+
+function defaultSharedSettings(){
+  return {category_id:null,location:'studio',unit_cost:0,is_on_sale:false,sale_price:null,ribbon_text:null,low_stock_threshold:5};
+}
+function deriveSharedSettings(variants){
+  if(!variants.length)return defaultSharedSettings();
+  const first=variants[0];
+  return {
+    category_id:first.category_id||null,
+    location:first.location||'studio',
+    unit_cost:first.unit_cost||0,
+    is_on_sale:!!first.is_on_sale,
+    sale_price:first.sale_price!=null?first.sale_price:null,
+    ribbon_text:first.ribbon_text||null,
+    low_stock_threshold:first.low_stock_threshold||5
+  };
 }
 
 function blankListing(title){
@@ -97,6 +115,7 @@ function openListingDetail(idx){
     _recipeRows:PS.recipesAll.filter(r=>r.finished_sku_id===s.id),
     _isNew:false
   }));
+  PS.sharedSettings=deriveSharedSettings(PS.variants);
   PS.expandedId=null;
   PS.newVariantCounter=0;
   renderListingDetail();
@@ -129,11 +148,75 @@ function renderListingDetail(){
     <button class="btn btn-p" onclick="saveListingContent()">Save Listing Content</button>
   </div>`;
 
+  html+=sharedSettingsCardHtml();
+
   html+=`<div class="card"><div class="card-title">🎨 Variants (${PS.variants.length})</div>`;
   PS.variants.forEach(v=>{html+=variantAccordionHtml(v);});
   html+=`<button class="btn btn-g btn-block" onclick="addNewVariant()">+ Add Variant</button></div>`;
 
   $('body').innerHTML=html;
+}
+
+function sharedSettingsCardHtml(){
+  const s=PS.sharedSettings;
+  const cats=PS.categories||[];
+  return `<div class="card">
+    <div class="card-title">⚙️ Shared Settings <span class="t-muted" style="font-size:11px;font-weight:400">(one edit applies to every variant under this product)</span></div>
+    <div class="field-row field-row-2">
+      <div><label class="lbl">Category</label>
+        <select class="inp" id="ls-cat"><option value="">— None —</option>
+          ${cats.map(c=>`<option value="${c.id}" ${s.category_id===c.id?'selected':''}>${c.name}</option>`).join('')}
+        </select></div>
+      <div><label class="lbl">Location</label>
+        <select class="inp" id="ls-loc">
+          <option value="studio" ${s.location==='studio'?'selected':''}>Studio</option>
+          <option value="warehouse" ${s.location==='warehouse'?'selected':''}>Warehouse</option>
+        </select></div>
+    </div>
+    <div class="field-row field-row-2">
+      <div><label class="lbl">Unit Cost (₱)</label><input class="inp" type="number" step="0.01" id="ls-cost" value="${s.unit_cost||0}"></div>
+      <div><label class="lbl">Low Stock Threshold</label><input class="inp" type="number" id="ls-threshold" value="${s.low_stock_threshold||5}"></div>
+    </div>
+    <div class="check-row"><input type="checkbox" id="ls-onsale" ${s.is_on_sale?'checked':''}><label for="ls-onsale">On Sale</label></div>
+    <label class="lbl">Sale Price (₱)</label>
+    <input class="inp" type="number" step="0.01" id="ls-saleprice" value="${s.sale_price!=null?s.sale_price:''}">
+    <label class="lbl">Ribbon Text</label>
+    <input class="inp" id="ls-ribbon" value="${attrEsc(s.ribbon_text)}" placeholder="e.g. Bestseller, New Arrival">
+    <button class="btn btn-p" id="ls-save-btn" style="margin-top:12px" onclick="saveSharedSettings()">Save Shared Settings</button>
+    <p class="t-muted" style="font-size:11px;margin-top:8px">${PS.variants.filter(v=>!v._isNew).length} existing variant(s) will be updated. Any variant you add afterward starts with these values too.</p>
+  </div>`;
+}
+
+async function saveSharedSettings(){
+  const salePrice=$('ls-saleprice').value;
+  const payload={
+    category_id:$('ls-cat').value||null,
+    location:$('ls-loc').value,
+    unit_cost:parseFloat($('ls-cost').value)||0,
+    is_on_sale:$('ls-onsale').checked,
+    sale_price:salePrice?parseFloat(salePrice):null,
+    ribbon_text:$('ls-ribbon').value.trim()||null,
+    low_stock_threshold:parseInt($('ls-threshold').value)||5
+  };
+  const btn=$('ls-save-btn');
+  const orig=btn?btn.textContent:null;
+  if(btn){btn.textContent='Saving...';btn.disabled=true;}
+  try{
+    const existing=PS.variants.filter(v=>!v._isNew);
+    if(existing.length){
+      const r=await fetch(`${SB_URL}/rest/v1/skus?product_name=eq.${encodeURIComponent(PS.currentTitle)}`,{
+        method:'PATCH',headers:authHeaders({'Content-Type':'application/json'}),
+        body:JSON.stringify(payload)
+      });
+      if(!r.ok)throw new Error(await r.text());
+    }
+    PS.sharedSettings=payload;
+    PS.variants.forEach(v=>Object.assign(v,payload));
+    if(PS.allSkus){PS.allSkus.forEach(s=>{if(s.product_name===PS.currentTitle)Object.assign(s,payload);});}
+    toast('✓ Shared settings saved for all variants!');
+    renderListingDetail();
+  }catch(e){toast('Error: '+e.message);}
+  finally{if(btn){btn.textContent=orig;btn.disabled=false;}}
 }
 
 function variantAccordionHtml(v){
@@ -164,39 +247,19 @@ function recipeRowHtml(key,ri,row){
 }
 
 function variantFormHtml(v,key){
-  const cats=PS.categories||[];
   const hasRecipe=v._recipeRows&&v._recipeRows.length>0;
   return `
     <label class="lbl">Variant Name</label>
     <input class="inp" id="v-variant-${key}" value="${attrEsc(v.variant)}">
     <label class="lbl">SKU Code ${v._isNew?'*':''}</label>
     <input class="inp" id="v-sku-${key}" value="${attrEsc(v.sku_code)}" ${v._isNew?'':'readonly style="background:var(--pearl)"'}>
-    <div class="field-row field-row-2">
-      <div><label class="lbl">Category</label>
-        <select class="inp" id="v-cat-${key}"><option value="">— None —</option>
-          ${cats.map(c=>`<option value="${c.id}" ${v.category_id===c.id?'selected':''}>${c.name}</option>`).join('')}
-        </select></div>
-      <div><label class="lbl">Location</label>
-        <select class="inp" id="v-loc-${key}">
-          <option value="studio" ${v.location==='studio'?'selected':''}>Studio</option>
-          <option value="warehouse" ${v.location==='warehouse'?'selected':''}>Warehouse</option>
-        </select></div>
-    </div>
-    <div class="field-row field-row-2">
-      <div><label class="lbl">Unit Cost (₱)</label><input class="inp" type="number" step="0.01" id="v-cost-${key}" value="${v.unit_cost||0}"></div>
-      <div><label class="lbl">Current Stock</label><input class="inp" type="number" id="v-stock-${key}" value="${v.current_stock||0}"></div>
-    </div>
+    <label class="lbl">Current Stock</label>
+    <input class="inp" type="number" id="v-stock-${key}" value="${v.current_stock||0}">
+    <p class="t-muted" style="font-size:11px;margin:-4px 0 12px">Category, Location, Unit Cost, On Sale, Sale Price, Ribbon Text, and Low Stock Threshold are shared across all variants — edit them once in Shared Settings above.</p>
     <div class="field-row field-row-2">
       <div><label class="lbl">Price – Direct (₱)</label><input class="inp" type="number" step="0.01" id="v-pricedirect-${key}" value="${v.retail_price_direct!=null?v.retail_price_direct:''}"></div>
       <div><label class="lbl">Price – Shopee (₱)</label><input class="inp" type="number" step="0.01" id="v-priceshopee-${key}" value="${v.retail_price_shopee!=null?v.retail_price_shopee:''}"></div>
     </div>
-    <div class="check-row"><input type="checkbox" id="v-onsale-${key}" ${v.is_on_sale?'checked':''}><label for="v-onsale-${key}">On Sale</label></div>
-    <label class="lbl">Sale Price (₱)</label>
-    <input class="inp" type="number" step="0.01" id="v-saleprice-${key}" value="${v.sale_price!=null?v.sale_price:''}">
-    <label class="lbl">Ribbon Text</label>
-    <input class="inp" id="v-ribbon-${key}" value="${attrEsc(v.ribbon_text)}" placeholder="e.g. Bestseller, New Arrival">
-    <label class="lbl">Low Stock Threshold</label>
-    <input class="inp" type="number" id="v-threshold-${key}" value="${v.low_stock_threshold||5}">
     <label class="lbl">Photo URL <span class="t-muted">(this specific variant)</span></label>
     <input class="inp" id="v-photo-${key}" value="${attrEsc(v.photo_url)}" placeholder="Paste a photo URL">
     <label class="lbl">Supplier/Source</label>
@@ -239,11 +302,12 @@ function addVariantRecipeRow(key){
 function addNewVariant(){
   PS.newVariantCounter++;
   const tempId='newv'+PS.newVariantCounter;
+  const s=PS.sharedSettings||defaultSharedSettings();
   PS.variants.push({
     id:null,_tempId:tempId,_isNew:true,product_name:PS.currentTitle,
-    sku_code:'',variant:'',category_id:null,location:'studio',unit_cost:0,
+    sku_code:'',variant:'',category_id:s.category_id,location:s.location,unit_cost:s.unit_cost,
     current_stock:0,retail_price_direct:null,retail_price_shopee:null,
-    is_on_sale:false,sale_price:null,ribbon_text:null,low_stock_threshold:5,
+    is_on_sale:s.is_on_sale,sale_price:s.sale_price,ribbon_text:s.ribbon_text,low_stock_threshold:s.low_stock_threshold,
     supplier_source:null,notes:null,is_active:true,photo_url:'',_recipeRows:[]
   });
   PS.expandedId=tempId;
@@ -302,21 +366,21 @@ async function saveVariant(key){
   if(!skuCode){toast('SKU Code is required.');return;}
   const priceDirect=$('v-pricedirect-'+key).value;
   const priceShopee=$('v-priceshopee-'+key).value;
-  const salePrice=$('v-saleprice-'+key).value;
+  const shared=PS.sharedSettings||defaultSharedSettings();
   const payload={
     sku_code:skuCode,
     product_name:PS.currentTitle,
     variant:$('v-variant-'+key).value.trim()||null,
-    category_id:$('v-cat-'+key).value||null,
-    location:$('v-loc-'+key).value,
-    unit_cost:parseFloat($('v-cost-'+key).value)||0,
+    category_id:shared.category_id,
+    location:shared.location,
+    unit_cost:shared.unit_cost,
     current_stock:parseInt($('v-stock-'+key).value)||0,
     retail_price_direct:priceDirect?parseFloat(priceDirect):null,
     retail_price_shopee:priceShopee?parseFloat(priceShopee):null,
-    is_on_sale:$('v-onsale-'+key).checked,
-    sale_price:salePrice?parseFloat(salePrice):null,
-    ribbon_text:$('v-ribbon-'+key).value.trim()||null,
-    low_stock_threshold:parseInt($('v-threshold-'+key).value)||5,
+    is_on_sale:shared.is_on_sale,
+    sale_price:shared.sale_price,
+    ribbon_text:shared.ribbon_text,
+    low_stock_threshold:shared.low_stock_threshold,
     supplier_source:$('v-supplier-'+key).value.trim()||null,
     notes:$('v-notes-'+key).value.trim()||null,
     is_active:$('v-active-'+key).checked,
