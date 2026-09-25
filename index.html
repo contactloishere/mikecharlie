@@ -244,6 +244,20 @@ const S={
 function saveCart(){localStorage.setItem('mcc_cart',JSON.stringify(S.cart));updateCartBadge();}
 function saveLikes(){localStorage.setItem('mcc_likes',JSON.stringify([...S.likes]));}
 
+/* ─── CATEGORY DEEP-LINKS ───
+   Lets a nav link (or any link) land on the shop pre-filtered to a
+   category, e.g. /?category=preloved for "Preloved Sale (Garage Sale)".
+   Add more short slugs here as needed — they never need to match the
+   category's exact display name. */
+const CATEGORY_SLUGS={preloved:'Preloved Sale (Garage Sale)'};
+function applyCategoryFromUrl(){
+  const slug=new URLSearchParams(location.search).get('category');
+  if(!slug)return;
+  const wantName=CATEGORY_SLUGS[slug]||slug;
+  const match=S.categories.find(c=>c.name.toLowerCase()===wantName.toLowerCase());
+  if(match)S.catFilter=match.id;
+}
+
 /* ─── LOAD DATA ─── */
 async function init(){
   try{
@@ -263,6 +277,7 @@ async function init(){
     });
     S.skus=skus;S.categories=cats;
     groupProducts();
+    applyCategoryFromUrl();
     renderCatBar();
     renderGrid();
     updateCartBadge();
