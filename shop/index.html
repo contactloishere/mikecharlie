@@ -668,6 +668,8 @@ function goCheckout(){
   toast('Checkout is launching very soon — thanks for your patience! 🌿');
 }
 
+<div id="section-checkout"></div>
+<script>loadPartial('section-checkout', '/partials/checkout-modal.html');</script>
 /* Auth (modal open/close, sign in/up forms, session save/restore) and mobile nav open/close all live in /partials/shared.js now — do not redeclare them here. loadSharedParts() already calls restoreSessionUI() for us. */
 
 init();
