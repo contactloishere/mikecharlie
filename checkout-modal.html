@@ -1,0 +1,308 @@
+<!-- partials/checkout-modal.html
+     Self-contained: own styles + own script, loaded via loadPartial()
+     into a placeholder div on shop-index.html, same pattern as
+     partials/hotel-partner-new-section.html.
+     Reuses .modal / .modal-box / .modal-close / .lbl / .inp / .btn*
+     classes already defined globally in shop-index.html — only the
+     checkout-specific bits get their own styles below. -->
+
+<div class="modal" id="checkout-modal">
+  <div class="modal-box" style="max-width:460px">
+    <button class="modal-close" onclick="closeCheckoutModal()">✕</button>
+    <div id="checkout-content"></div>
+  </div>
+</div>
+
+<style>
+.co-recap{border:1px solid var(--sand);border-radius:9px;padding:10px 12px;margin-bottom:14px;max-height:160px;overflow-y:auto}
+.co-recap-row{display:flex;justify-content:space-between;font-size:12px;color:var(--text-mid);padding:3px 0}
+.co-totals{border:1px solid var(--sand);border-radius:9px;padding:12px 14px;margin:12px 0;background:var(--pearl)}
+.co-totals-row{display:flex;justify-content:space-between;font-size:13px;color:var(--text-mid);margin-bottom:4px}
+.co-totals-row.grand{font-weight:600;color:var(--lagoon);font-size:15px;border-top:1px solid var(--sand);padding-top:6px;margin-top:6px}
+.co-note{font-size:11px;color:#92600A;background:#FFF8EE;border-left:3px solid var(--golden);border-radius:6px;padding:8px 10px;margin:8px 0}
+.co-qr{text-align:center;margin:10px 0}
+.co-qr img{width:160px;height:160px;object-fit:contain;border-radius:8px;box-shadow:var(--shadow)}
+.co-qr p{font-size:11px;color:var(--text-muted);margin-top:6px}
+.co-upload{border:2px dashed var(--sand);border-radius:9px;padding:1rem;text-align:center;cursor:pointer;margin-bottom:12px}
+.co-upload.done{border-color:var(--success);background:var(--success-bg)}
+</style>
+
+<script>
+/* ─── Mike Charlie Co. shipping rate matrix (region-based) ───
+   Same table already used on Lois's Clearance Sale — this is Mike
+   Charlie's own official rate sheet, just reused here. */
+const CO_SHIPPING_RATES = [
+  { id: "romblon", label: "Romblon", tiers: [110, 140, 170] },
+  { id: "marinduque_mindoro", label: "Marinduque / Mindoro Occidental / Mindoro Oriental", tiers: [100, 130, 170] },
+  { id: "palawan", label: "Palawan", tiers: [80, 110, 170] },
+  { id: "guimaras", label: "Guimaras", tiers: [110, 140, 170] },
+  { id: "iloilo_capiz_antique_aklan", label: "Iloilo City / Iloilo Province / Capiz / Antique / Aklan", tiers: [90, 105, 120] },
+  { id: "davao", label: "Davao Region", tiers: [100, 130, 170] },
+  { id: "bicol_non_remote", label: "Bicol — Albay, Camarines Norte, Camarines Sur, Catanduanes, Masbate, Sorsogon", tiers: [100, 130, 170] },
+  { id: "bicol_remote", label: "Bicol (remote) — Mercedes, Caramoan, Claveria, San Fernando, San Jacinto, San Pascual, Monreal, Magallanes", tiers: [110, 140, 170] },
+  { id: "ncr", label: "NCR (Metro Manila)", tiers: [100, 125, 170] },
+  { id: "cagayan_valley", label: "Cagayan / Isabela / Nueva Vizcaya / Quirino", tiers: [100, 130, 170] },
+  { id: "central_visayas_non_remote", label: "Cebu City / Cebu Province / Bohol / Negros Oriental", tiers: [90, 105, 120] },
+  { id: "central_visayas_remote", label: "Central Visayas (remote) — Santa Fe, Bantayan, Pilar, San Francisco, Tudela, Madridejos, Poro, Calape, Getafe, Pres. Carlos P. Garcia", tiers: [110, 140, 170] },
+  { id: "calabarzon", label: "Cavite / Laguna / Batangas / Rizal / Quezon", tiers: [100, 130, 170] },
+  { id: "soccsksargen", label: "South Cotabato / Cotabato / Sultan Kudarat / Sarangani", tiers: [100, 130, 170] },
+  { id: "central_luzon", label: "Aurora / Bataan / Bulacan / Nueva Ecija / Pampanga / Tarlac / Zambales", tiers: [100, 125, 170] },
+  { id: "armm_lanao_maguindanao", label: "Lanao del Sur / Maguindanao", tiers: [100, 130, 170] },
+  { id: "armm_basilan_sulu_tawitawi", label: "Basilan / Sulu / Tawi-Tawi", tiers: [110, 140, 170] },
+];
+const CO_WEIGHT_TIERS = [
+  { max: 0.5, index: 0 },
+  { max: 3, index: 1 },
+  { max: 5, index: 2 },
+];
+function coShippingRate(regionId, kg) {
+  const region = CO_SHIPPING_RATES.find(r => r.id === regionId);
+  if (!region) return null;
+  const tier = CO_WEIGHT_TIERS.find(t => kg <= t.max);
+  if (!tier) return null; // over 5kg — flagged for manual quote
+  return region.tiers[tier.index];
+}
+
+/* ─── Payment methods — same QR codes already used on the hotel portal ─── */
+const CO_PAYMENT_METHODS = [
+  { id: 'GCash', label: 'GCash', qr: 'https://nqtegxusqnehiljqijrn.supabase.co/storage/v1/object/public/qr-codes/GCash.png' },
+  { id: 'GoTyme', label: 'GoTyme', qr: 'https://nqtegxusqnehiljqijrn.supabase.co/storage/v1/object/public/qr-codes/GoTyme.png' },
+  { id: 'CIMB Bank', label: 'CIMB Bank', qr: 'https://nqtegxusqnehiljqijrn.supabase.co/storage/v1/object/public/qr-codes/Cimbank.png' },
+  { id: 'Maribank', label: 'Maribank', qr: 'https://nqtegxusqnehiljqijrn.supabase.co/storage/v1/object/public/qr-codes/Maribank.png' },
+  { id: 'BDO', label: 'BDO', qr: 'https://nqtegxusqnehiljqijrn.supabase.co/storage/v1/object/public/qr-codes/BDO.png' },
+];
+
+const checkoutState = { paymentMethod: '', proofFile: null };
+
+function checkoutItems() {
+  return S.cart.map(item => {
+    const sku = S.skus.find(s => s.id === item.sku_id);
+    if (!sku) return null;
+    const price = effectivePrice(sku);
+    return { sku, qty: item.qty, price, subtotal: price * item.qty };
+  }).filter(Boolean);
+}
+
+// NOTE for Lois: I'm guessing the weight column on skus is called
+// "weight_kg" or "weight". Please confirm the real name — if it's
+// something else, this one line is the only thing that needs fixing.
+function skuWeightKg(sku) {
+  return sku.weight_kg ?? sku.weight ?? 0;
+}
+function checkoutTotalWeight(items) {
+  return items.reduce((sum, i) => sum + skuWeightKg(i.sku) * i.qty, 0);
+}
+
+function openCheckoutModal() {
+  if (!S.cart.length) { toast('Your tote bag is empty.'); return; }
+  checkoutState.paymentMethod = '';
+  checkoutState.proofFile = null;
+  renderCheckoutForm();
+  $('checkout-modal').classList.add('show');
+}
+function closeCheckoutModal() {
+  $('checkout-modal').classList.remove('show');
+}
+
+function renderCheckoutForm() {
+  const items = checkoutItems();
+  const subtotal = items.reduce((s, i) => s + i.subtotal, 0);
+  $('checkout-content').innerHTML = `
+    <h2 style="font-size:1.3rem;color:var(--lagoon);margin-bottom:12px">Checkout</h2>
+    <div class="co-recap">
+      ${items.map(i => `<div class="co-recap-row"><span>${i.sku.product_name}${i.sku.variant ? ' — ' + i.sku.variant : ''} ×${i.qty}</span><span>${P(i.subtotal)}</span></div>`).join('')}
+    </div>
+    <form id="checkout-form">
+      <label class="lbl">Full name *</label>
+      <input class="inp" type="text" id="co-name" required>
+      <label class="lbl">Delivery address *</label>
+      <textarea class="inp" id="co-address" rows="2" required></textarea>
+      <label class="lbl">Contact number *</label>
+      <input class="inp" type="tel" id="co-contact" placeholder="09XX XXX XXXX" required>
+      <label class="lbl">Preferred platform for updates *</label>
+      <select class="inp" id="co-platform" required onchange="coPlatformChange()">
+        <option value="" disabled selected>Select a platform</option>
+        <option value="threads">Threads</option>
+        <option value="imessage">iMessage</option>
+        <option value="whatsapp">WhatsApp</option>
+        <option value="viber">Viber</option>
+        <option value="instagram">Instagram</option>
+      </select>
+      <label class="lbl" id="co-handle-label">Your handle or number *</label>
+      <input class="inp" type="text" id="co-handle" placeholder="Select a platform first" required>
+      <label class="lbl">Shipping region *</label>
+      <select class="inp" id="co-region" required onchange="updateCheckoutTotals()">
+        <option value="" disabled selected>Select your region</option>
+        ${CO_SHIPPING_RATES.map(r => `<option value="${r.id}">${r.label}</option>`).join('')}
+      </select>
+      <div class="co-totals">
+        <div class="co-totals-row"><span>Items subtotal</span><span id="co-subtotal">${P(subtotal)}</span></div>
+        <div class="co-totals-row"><span>Shipping</span><span id="co-shipping">Select a region</span></div>
+        <div class="co-totals-row grand"><span>Total</span><span id="co-grand">${P(subtotal)}</span></div>
+      </div>
+      <div class="co-note" id="co-manual-note" style="display:none">Your order's a bit heavier than our standard rates cover — I'll check the exact shipping cost myself and confirm it with you before anything ships.</div>
+      <label class="lbl">Preferred mode of payment *</label>
+      <select class="inp" id="co-payment" required onchange="pickCheckoutPayment(this.value)">
+        <option value="" disabled selected>Select a payment method</option>
+        ${CO_PAYMENT_METHODS.map(m => `<option value="${m.id}">${m.label}</option>`).join('')}
+      </select>
+      <div class="co-qr" id="co-qr" style="display:none">
+        <img id="co-qr-img" src="" alt="Payment QR code">
+        <p id="co-qr-caption"></p>
+      </div>
+      <label class="lbl">Upload proof of payment *</label>
+      <div class="co-upload" id="co-upload-box" onclick="document.getElementById('co-proof').click()">
+        <div id="co-upload-text">📎 Tap to upload screenshot of payment</div>
+        <input type="file" id="co-proof" accept="image/*" style="display:none" onchange="pickCheckoutProof(this)">
+      </div>
+      <button class="btn btn-p" style="width:100%" type="submit" id="co-submit">Submit order</button>
+    </form>`;
+  $('checkout-form').addEventListener('submit', submitCheckout);
+}
+
+function coPlatformChange() {
+  const v = $('co-platform').value;
+  const labels = { threads: 'Threads handle', imessage: 'iMessage number', whatsapp: 'WhatsApp number', viber: 'Viber number', instagram: 'Instagram handle' };
+  $('co-handle-label').textContent = (labels[v] || 'Your handle or number') + ' *';
+}
+
+function updateCheckoutTotals() {
+  const items = checkoutItems();
+  const subtotal = items.reduce((s, i) => s + i.subtotal, 0);
+  const regionId = $('co-region').value;
+  $('co-subtotal').textContent = P(subtotal);
+  if (!regionId) {
+    $('co-shipping').textContent = 'Select a region';
+    $('co-grand').textContent = P(subtotal);
+    $('co-manual-note').style.display = 'none';
+    return;
+  }
+  const kg = checkoutTotalWeight(items);
+  const fee = coShippingRate(regionId, kg);
+  if (fee === null) {
+    $('co-shipping').textContent = 'To be confirmed';
+    $('co-grand').textContent = P(subtotal) + ' + shipping';
+    $('co-manual-note').style.display = 'block';
+    return;
+  }
+  $('co-shipping').textContent = P(fee);
+  $('co-grand').textContent = P(subtotal + fee);
+  $('co-manual-note').style.display = 'none';
+}
+
+function pickCheckoutPayment(id) {
+  checkoutState.paymentMethod = id;
+  const m = CO_PAYMENT_METHODS.find(x => x.id === id);
+  if (m) {
+    $('co-qr-img').src = m.qr;
+    $('co-qr-caption').textContent = m.label;
+    $('co-qr').style.display = 'block';
+  }
+}
+function pickCheckoutProof(input) {
+  const file = input.files[0];
+  if (!file) return;
+  checkoutState.proofFile = file;
+  $('co-upload-box').classList.add('done');
+  $('co-upload-text').textContent = '✓ ' + file.name;
+}
+
+async function uploadPaymentProof(file) {
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const path = `proof-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const r = await fetch(`${SB_URL}/storage/v1/object/payment-proofs/${path}`, {
+    method: 'POST',
+    headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': file.type || 'application/octet-stream' },
+    body: file
+  });
+  if (!r.ok) { const t = await r.text(); throw new Error(t); }
+  return `${SB_URL}/storage/v1/object/public/payment-proofs/${path}`;
+}
+
+async function sendCheckoutTelegram(o) {
+  try {
+    const itemLines = (o.items || []).map(i => `• ${i.product_name}${i.variant ? ' — ' + i.variant : ''} ×${i.qty} — ${P(i.subtotal)}`).join('\n');
+    const shippingLine = o.shipping === null ? 'To be confirmed (over 5kg)' : P(o.shipping);
+    const totalLine = o.total === null ? `${P(o.subtotal)} + shipping (TBD)` : P(o.total);
+    const text = `🛍️ New order — Mike Charlie Co. Shop\n\n` +
+      `Name: ${o.name}\nContact: ${o.contact}\nReach them via: ${o.platform} — ${o.handle}\n` +
+      `Address: ${o.address}\nRegion: ${o.region}\nPayment method: ${o.paymentMethod}\n\n` +
+      `Items:\n${itemLines}\n\nSubtotal: ${P(o.subtotal)}\nShipping: ${shippingLine}\nTotal: ${totalLine}\n\n` +
+      `Proof of payment: ${o.proofUrl}`;
+    await fetch('/api/notify-telegram', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text }) });
+  } catch (err) { console.warn('Telegram notify failed (order was still saved):', err); }
+}
+
+async function submitCheckout(e) {
+  e.preventDefault();
+  const items = checkoutItems();
+  const name = $('co-name').value.trim();
+  const address = $('co-address').value.trim();
+  const contact = $('co-contact').value.trim();
+  const platform = $('co-platform').value;
+  const handle = $('co-handle').value.trim();
+  const regionId = $('co-region').value;
+  const region = CO_SHIPPING_RATES.find(r => r.id === regionId);
+  const paymentMethod = checkoutState.paymentMethod;
+  const proofFile = checkoutState.proofFile;
+
+  if (!name || !address || !contact || !platform || !handle || !regionId || !paymentMethod) {
+    toast('Please fill in all required fields.'); return;
+  }
+  if (!proofFile) { toast('Please upload your proof of payment.'); return; }
+
+  const btn = $('co-submit');
+  btn.disabled = true; btn.textContent = 'Uploading proof...';
+
+  let proofUrl;
+  try {
+    proofUrl = await uploadPaymentProof(proofFile);
+  } catch (err) {
+    console.error(err);
+    toast('Could not upload your proof of payment — please check the image and try again.');
+    btn.disabled = false; btn.textContent = 'Submit order';
+    return;
+  }
+
+  const subtotal = items.reduce((s, i) => s + i.subtotal, 0);
+  const kg = checkoutTotalWeight(items);
+  const fee = coShippingRate(regionId, kg);
+  const total = fee === null ? null : subtotal + fee;
+
+  btn.textContent = 'Submitting order...';
+  const orderItems = items.map(i => ({
+    sku_id: i.sku.id, product_name: i.sku.product_name, variant: i.sku.variant || null,
+    qty: i.qty, unit_price: i.price, subtotal: i.subtotal
+  }));
+
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/orders`, {
+      method: 'POST',
+      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({
+        customer_name: name, address, contact_number: contact,
+        contact_platform: platform, contact_handle: handle,
+        region_id: regionId, region_label: region ? region.label : null,
+        total_weight_kg: kg,
+        items: orderItems, subtotal, shipping_fee: fee, total,
+        payment_method: paymentMethod, proof_url: proofUrl,
+        status: 'new', current_stage: 'placed',
+        stage_dates: { placed: new Date().toISOString() }
+      })
+    });
+    if (!r.ok) { const t = await r.text(); throw new Error(t); }
+
+    sendCheckoutTelegram({ name, contact, platform, handle, address, region: region ? region.label : regionId, paymentMethod, items: orderItems, subtotal, shipping: fee, total, proofUrl });
+
+    S.cart.length = 0;
+    saveCart();
+    closeCheckoutModal();
+    closeCart();
+    toast("✓ Order submitted! I'll confirm your payment and message you soon.", 5000);
+  } catch (err) {
+    console.error(err);
+    toast('Something went wrong submitting your order. Please try again.');
+    btn.disabled = false; btn.textContent = 'Submit order';
+  }
+}
+</script>
