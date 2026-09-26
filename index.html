@@ -217,6 +217,9 @@ footer{background:var(--text-dark,#1C2E2C);color:rgba(247,243,236,.65);padding:2
 
 <div id="site-footer"></div>
 
+<div id="section-checkout"></div>
+<script>loadPartial('section-checkout', '/partials/checkout-modal.html');</script>
+
 <script src="/partials/shared.js"></script>
 <script>
 /* ─── SUPABASE ─── */
@@ -246,7 +249,7 @@ function saveLikes(){localStorage.setItem('mcc_likes',JSON.stringify([...S.likes
 
 /* ─── CATEGORY DEEP-LINKS ───
    Lets a nav link (or any link) land on the shop pre-filtered to a
-   category, e.g. /?category=preloved for "Preloved Sale (Garage Sale)".
+   category, e.g. /?category=preloved for "Prelove Sale (Garage Sale)".
    Add more short slugs here as needed — they never need to match the
    category's exact display name. */
 const CATEGORY_SLUGS={preloved:'Preloved Sale (Garage Sale)'};
@@ -307,42 +310,41 @@ function axis2Options(group,axis1){
 function findByAxes(group,axis1,axis2){
   return group.find(v=>v.variant_axis_1===axis1 && v.variant_axis_2===axis2);
 }
-
-/* ─── PRICING/IMAGES HELPERS ─── */
-function effectivePrice(sku){return (sku.is_on_sale && sku.sale_price!=null) ? sku.sale_price : sku.retail_price_direct;}
+function filteredGroups(){
+  if(!S.catFilter)return S.groups;
+  return S.groups.filter(g=>g.some(s=>s.category_id===S.catFilter || (s.categories&&s.categories.id===S.catFilter)));
+}
+function effectivePrice(sku){
+  if(sku.is_on_sale && sku.sale_price!=null)return sku.sale_price;
+  return sku.retail_price_direct;
+}
 function galleryFor(sku){
   const imgs=[];
   if(sku.variantPhotoUrl)imgs.push(sku.variantPhotoUrl);
-  const l=sku.listing||{};
-  [l.cover_image_url,l.image_1,l.image_2,l.image_3,l.image_4,l.image_5,l.image_6,l.image_7,l.image_8,l.image_9]
-    .forEach(u=>{if(u && !imgs.includes(u))imgs.push(u);});
+  if(sku.cover_image_url && sku.cover_image_url!==sku.variantPhotoUrl)imgs.push(sku.cover_image_url);
   return imgs;
 }
-
-/* ─── CATEGORY BAR ─── */
 function renderCatBar(){
-  $('cat-bar').innerHTML=`
-    <button class="cat-chip ${S.catFilter===''?'on':''}" onclick="setCatFilter('')">All</button>
-    ${S.categories.map(c=>`<button class="cat-chip ${S.catFilter===c.id?'on':''}" onclick="setCatFilter('${c.id}')">${c.name}</button>`).join('')}
-  `;
+  const cats=S.categories;
+  $('cat-bar').innerHTML=`<button class="cat-chip ${!S.catFilter?'on':''}" onclick="setCatFilter('')">All</button>`+
+    cats.map(c=>`<button class="cat-chip ${S.catFilter===c.id?'on':''}" onclick="setCatFilter('${c.id}')">${c.name}</button>`).join('');
 }
-function setCatFilter(id){S.catFilter=id;S.displayCount=12;renderCatBar();renderGrid();}
-
-/* ─── GRID ─── */
-function filteredGroups(){
-  if(!S.catFilter)return S.groups;
-  return S.groups.filter(g=>g[0].categories && g[0].categories.id===S.catFilter);
+function setCatFilter(id){
+  S.catFilter=id;S.displayCount=12;
+  renderCatBar();renderGrid();
 }
 function renderGrid(){
   const groups=filteredGroups();
-  if(!groups.length){$('pgrid').innerHTML=`<div class="empty" style="grid-column:1/-1">No products in this category yet.</div>`;return;}
-  const visible=groups.slice(0,S.displayCount);
-  $('pgrid').innerHTML=visible.map((g,gi)=>productCardHtml(g,gi)).join('');
-  visible.forEach((g,gi)=>bindCardEvents(gi));
-  $('sentinel').textContent = S.displayCount<groups.length ? 'Loading more…' : (groups.length?'':'');
+  const shown=groups.slice(0,S.displayCount);
+  if(!shown.length){
+    $('pgrid').innerHTML=`<div class="empty" style="grid-column:1/-1">No products found.</div>`;
+    return;
+  }
+  $('pgrid').innerHTML=shown.map((g,gi)=>cardHtml(g,gi)).join('');
+  shown.forEach((g,gi)=>bindCardEvents(gi));
 }
-function productCardHtml(group,gi){
-  const sku=group[0]; // default to first variant
+function cardHtml(group,gi){
+  const sku=group[0];
   const imgs=galleryFor(sku);
   const price=effectivePrice(sku);
   const low=sku.current_stock<=sku.low_stock_threshold && sku.current_stock>0;
@@ -351,20 +353,20 @@ function productCardHtml(group,gi){
   let variantControlHtml='';
   if(twoAxis){
     const a1opts=axis1Options(group);
-    const a2opts=axis2Options(group,a1opts[0]);
-    variantControlHtml=`<select class="pcard-variant" onclick="event.stopPropagation()" onchange="cardAxis1Change(${gi},this.value)" id="card-axis1-${gi}">
+    const a2opts=axis2Options(group,sku.variant_axis_1);
+    variantControlHtml=`<select class="pcard-variant" id="card-axis1-${gi}" onclick="event.stopPropagation()" onchange="cardAxis1Change(${gi},this.value)">
         ${a1opts.map(a=>`<option>${a}</option>`).join('')}
       </select>
-      <select class="pcard-variant" onclick="event.stopPropagation()" onchange="cardAxis2Change(${gi},this.value)" id="card-axis2-${gi}">
+      <select class="pcard-variant" id="card-axis2-${gi}" onclick="event.stopPropagation()" onchange="cardAxis2Change(${gi},this.value)">
         ${a2opts.map(a=>`<option>${a}</option>`).join('')}
       </select>`;
   }else if(group.length>1){
     variantControlHtml=`<select class="pcard-variant" onclick="event.stopPropagation()" onchange="cardVariantChange(${gi},this.selectedIndex)">
-        ${group.map(v=>`<option>${v.variant||v.sku_code}</option>`).join('')}
-      </select>`;
+      ${group.map(v=>`<option>${v.variant||v.sku_code}</option>`).join('')}
+    </select>`;
   }
-  return `<div class="pcard">
-    <div class="pcard-gallery" data-gi="${gi}">
+  return `<div class="pcard" data-gi="${gi}">
+    <div class="pcard-gallery">
       <div class="pcard-scroll" id="cardscroll-${gi}">
         ${imgs.length?imgs.map(u=>`<img src="${u}" loading="lazy">`).join(''):`<div class="pcard-ph">🌿</div>`}
       </div>
@@ -665,11 +667,10 @@ function removeCartItem(idx){
   saveCart();renderCart();
 }
 function goCheckout(){
-  toast('Checkout is launching very soon — thanks for your patience! 🌿');
+  closeCart();
+  openCheckoutModal();
 }
 
-<div id="section-checkout"></div>
-<script>loadPartial('section-checkout', '/partials/checkout-modal.html');</script>
 /* Auth (modal open/close, sign in/up forms, session save/restore) and mobile nav open/close all live in /partials/shared.js now — do not redeclare them here. loadSharedParts() already calls restoreSessionUI() for us. */
 
 init();
