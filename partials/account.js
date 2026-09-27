@@ -15,12 +15,12 @@ const STAGE_LABELS = {
   shipped: 'Order picked up by courier'
 };
 
-// EDIT THIS with Lois's real handles/links once she sends them.
 const CONTACT_PLATFORMS = [
-  { key: 'instagram', label: 'Instagram', url: 'https://instagram.com/REPLACE_ME' },
-  { key: 'threads', label: 'Threads', url: 'https://threads.net/@REPLACE_ME' },
-  { key: 'whatsapp', label: 'WhatsApp', url: 'https://wa.me/REPLACE_ME' },
-  { key: 'viber', label: 'Viber', url: 'viber://chat?number=REPLACE_ME' }
+  { key: 'instagram', label: 'Instagram', url: 'https://www.instagram.com/mikecharlieco/' },
+  { key: 'threads', label: 'Threads', url: 'https://www.threads.com/mikecharlieco/' },
+  { key: 'whatsapp', label: 'WhatsApp', url: 'https://wa.me/message/T7LXVS3L74A5C1' },
+  { key: 'viber', label: 'Viber', url: 'viber://chat?number=639760467782' },
+  { key: 'imessage', label: 'iMessage', url: 'sms:+639760467782' }
 ];
 
 const PHONE_PLATFORMS = ['imessage', 'whatsapp', 'viber'];
