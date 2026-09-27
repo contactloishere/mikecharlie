@@ -98,6 +98,11 @@ async function submitAuth() {
     }
     saveSession(data);
     showLoggedInState(data.user.email);
+    if (window._proceedToCheckoutAfterAuth) {
+      window._proceedToCheckoutAfterAuth = false;
+      window.location.href = '/checkout.html';
+      return;
+    }
   } catch (e) { errBox.textContent = e.message; errBox.style.display = 'block'; }
   finally { btn.textContent = orig; btn.disabled = false; }
 }
@@ -123,6 +128,53 @@ function restoreSessionUI() {
       link.onclick = function () { openAuthModal(); showLoggedInState(session.user.email); };
     }
   }
+}
+
+/* ─── ACCOUNT CHOICE (shown when a customer clicks Checkout) ───
+   Lets them pick: create an account, log in, or continue as a guest,
+   before landing on the checkout page. Self-contained (injects its own
+   HTML/CSS) so it works on any page that loads this file. */
+const ACCOUNT_CHOICE_HTML = `
+<div id="account-choice-modal" style="position:fixed;inset:0;background:rgba(28,46,44,.65);z-index:199;display:none;align-items:center;justify-content:center;padding:1rem;font-family:'DM Sans',sans-serif">
+  <div style="background:#fff;border-radius:16px;padding:2rem 1.75rem;width:100%;max-width:380px;box-shadow:0 8px 36px rgba(62,95,92,0.18);position:relative">
+    <button onclick="closeAccountChoice()" style="position:absolute;top:12px;right:14px;background:#E6D5C3;border:none;border-radius:50%;width:30px;height:30px;font-size:16px;cursor:pointer">✕</button>
+    <h2 style="font-family:'Cormorant Garamond',serif;font-size:1.5rem;color:#3E5F5C;text-align:center;margin-bottom:8px">Track your order?</h2>
+    <p style="font-size:13px;color:#4A6862;text-align:center;line-height:1.6;margin-bottom:1.5rem">Create a free account to see your order status and history anytime — or check out as a guest, no account needed.</p>
+    <button onclick="chooseCreateAccount()" style="width:100%;padding:13px;border-radius:9px;background:#3E5F5C;color:#F7F3EC;border:none;font-size:14px;font-weight:500;margin-bottom:10px;cursor:pointer">Create Account</button>
+    <button onclick="chooseLogIn()" style="width:100%;padding:13px;border-radius:9px;background:#fff;color:#3E5F5C;border:1.5px solid #3E5F5C;font-size:14px;font-weight:500;margin-bottom:10px;cursor:pointer">Log In</button>
+    <button onclick="continueAsGuest()" style="width:100%;padding:13px;border-radius:9px;background:#F0E8DA;color:#4A6862;border:none;font-size:14px;font-weight:500;cursor:pointer">Continue as Guest</button>
+    <p style="font-size:11px;color:#8FA9A4;text-align:center;line-height:1.6;margin-top:14px">Checking out as a guest is totally fine — you just won't be able to look up this order later unless you sign up.</p>
+  </div>
+</div>`;
+document.addEventListener('DOMContentLoaded', () => {
+  if (!document.getElementById('account-choice-modal')) {
+    document.body.insertAdjacentHTML('beforeend', ACCOUNT_CHOICE_HTML);
+  }
+});
+function openAccountChoice() {
+  closeCart();
+  const el = document.getElementById('account-choice-modal');
+  if (el) el.style.display = 'flex';
+}
+function closeAccountChoice() {
+  const el = document.getElementById('account-choice-modal');
+  if (el) el.style.display = 'none';
+}
+function continueAsGuest() {
+  closeAccountChoice();
+  window.location.href = '/checkout.html';
+}
+function chooseCreateAccount() {
+  closeAccountChoice();
+  window._proceedToCheckoutAfterAuth = true;
+  openAuthModal();
+  setAuthMode('signup');
+}
+function chooseLogIn() {
+  closeAccountChoice();
+  window._proceedToCheckoutAfterAuth = true;
+  openAuthModal();
+  setAuthMode('signin');
 }
 
 /* ─── MOBILE NAV ─── */
