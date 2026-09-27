@@ -98,9 +98,14 @@ async function submitAuth() {
     }
     saveSession(data);
     showLoggedInState(data.user.email);
+    await migrateGuestLikesToServer();
     if (window._proceedToCheckoutAfterAuth) {
       window._proceedToCheckoutAfterAuth = false;
       window.location.href = '/checkout.html';
+      return;
+    }
+    if (typeof S !== 'undefined' && S.likes) {
+      window.location.reload(); // refresh hearts on-page to reflect merged likes
       return;
     }
   } catch (e) { errBox.textContent = e.message; errBox.style.display = 'block'; }
@@ -127,6 +132,42 @@ function restoreSessionUI() {
       link.textContent = 'My Account';
       link.onclick = function () { openAuthModal(); showLoggedInState(session.user.email); };
     }
+  }
+}
+
+/* ─── LIKES SYNC (server-side, for logged-in customers) ───
+   Guests keep using localStorage only (S.likes in index.html). Once
+   someone's logged in, every heart tap also writes to/from mcc_likes
+   in Supabase, so likes follow them across devices and show up on
+   their account page. */
+async function syncLikeToServer(skuId, liked) {
+  const session = loadSession();
+  if (!session || Date.now() >= session.expires_at) return;
+  const headers = { apikey: SB_KEY, Authorization: 'Bearer ' + session.access_token, 'Content-Type': 'application/json' };
+  try {
+    if (liked) {
+      await fetch(`${SB_URL}/rest/v1/mcc_likes`, { method: 'POST', headers: { ...headers, Prefer: 'resolution=merge-duplicates' }, body: JSON.stringify({ customer_id: session.user.id, sku_id: skuId }) });
+    } else {
+      await fetch(`${SB_URL}/rest/v1/mcc_likes?customer_id=eq.${session.user.id}&sku_id=eq.${skuId}`, { method: 'DELETE', headers });
+    }
+  } catch (e) { /* not fatal — local like still saved either way */ }
+}
+async function fetchServerLikes() {
+  const session = loadSession();
+  if (!session || Date.now() >= session.expires_at) return null;
+  try {
+    const rows = await fetch(`${SB_URL}/rest/v1/mcc_likes?customer_id=eq.${session.user.id}&select=sku_id`, { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + session.access_token } }).then(r => r.json());
+    return rows.map(r => r.sku_id);
+  } catch (e) { return null; }
+}
+// Called right after a successful login/signup: uploads any likes the
+// guest collected locally before signing in, so nothing gets lost.
+async function migrateGuestLikesToServer() {
+  if (typeof S === 'undefined' || !S.likes) return;
+  const serverLikes = await fetchServerLikes();
+  if (serverLikes === null) return;
+  for (const skuId of S.likes) {
+    if (!serverLikes.includes(skuId)) await syncLikeToServer(skuId, true);
   }
 }
 
