@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Checkout — Mike Charlie Co.</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --lagoon:#3E5F5C;--lagoon-dark:#2C4542;--teal:#729A94;--teal-light:#A8C5C0;
+  --golden:#D1A679;--golden-dark:#B8905F;--sand:#E6D5C3;--sand-light:#F0E8DA;
+  --pearl:#F7F3EC;--white:#FFFFFF;
+  --text-dark:#1C2E2C;--text-mid:#4A6862;--text-muted:#8FA9A4;
+  --danger:#C1121F;--danger-bg:#FFE8E8;--danger-border:#F5A0A0;
+  --success:#2D6A4F;--success-bg:#D8F3DC;--success-border:#A3D9B1;
+  --shadow:0 2px 12px rgba(62,95,92,0.09);
+  --shadow-lg:0 8px 36px rgba(62,95,92,0.18);
+}
+body{font-family:'DM Sans',sans-serif;background:var(--pearl);color:var(--text-dark);min-height:100vh}
+h1,h2,h3{font-family:'Cormorant Garamond',serif}
+button{font-family:'DM Sans',sans-serif;cursor:pointer}
+a{color:inherit}
+
+.hdr{position:sticky;top:0;z-index:90;background:var(--pearl);border-bottom:1px solid var(--sand);padding:1rem 1.25rem}
+.hdr-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.hdr h1{font-size:1.15rem;color:var(--lagoon)}
+.auth-link{background:var(--lagoon);color:var(--pearl);border:none;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:500}
+
+.wrap{max-width:680px;margin:0 auto;padding:1.5rem 1.25rem 4rem}
+.back-link{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text-mid);background:none;border:none;margin-bottom:1rem}
+
+.acct-banner{background:white;border:1px solid var(--sand);border-radius:12px;padding:14px 16px;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.acct-banner p{font-size:13px;color:var(--text-mid)}
+.acct-banner button{background:var(--lagoon);color:white;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:500;white-space:nowrap}
+.acct-banner.signed-in{background:var(--success-bg);border-color:var(--success-border)}
+.acct-banner.signed-in p{color:var(--success)}
+
+.section{background:white;border:1px solid var(--sand);border-radius:14px;padding:1.25rem 1.25rem 1.4rem;margin-bottom:1.25rem}
+.section h2{font-size:1.2rem;color:var(--lagoon);margin-bottom:1rem}
+
+.co-item{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--sand-light)}
+.co-item:last-child{border-bottom:none}
+.co-item-img{width:52px;height:52px;border-radius:8px;background:var(--sand-light);flex-shrink:0;object-fit:cover;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--teal-light)}
+.co-item-info{flex:1;display:flex;flex-direction:column;justify-content:center}
+.co-item-name{font-size:13px;font-weight:500}
+.co-item-var{font-size:11px;color:var(--text-muted)}
+.co-item-qty{font-size:11px;color:var(--text-muted)}
+.co-item-price{font-size:13px;font-weight:600;color:var(--lagoon);align-self:center}
+
+.lbl{display:block;font-size:13px;color:var(--text-mid);margin-bottom:5px;font-weight:500}
+.inp,select.inp{width:100%;padding:11px 12px;border:1.5px solid var(--sand);border-radius:9px;font-size:14px;margin-bottom:14px;font-family:inherit;background:white}
+.field-note{font-size:11.5px;color:var(--text-muted);margin-top:-10px;margin-bottom:14px;line-height:1.5}
+.handle-row{display:flex;align-items:center;border:1.5px solid var(--sand);border-radius:9px;margin-bottom:14px;overflow:hidden}
+.handle-prefix{padding:11px 4px 11px 12px;font-size:14px;color:var(--text-mid);background:var(--sand-light);white-space:nowrap}
+.handle-row input{border:none;padding:11px 12px 11px 4px;font-size:14px;flex:1;font-family:inherit}
+.handle-row input:focus{outline:none}
+
+.breakdown-row{display:flex;justify-content:space-between;font-size:14px;color:var(--text-mid);padding:6px 0}
+.breakdown-row.total{border-top:1px solid var(--sand);margin-top:8px;padding-top:14px}
+.breakdown-row.total span:first-child{font-size:1.1rem;color:var(--text-dark);font-weight:600}
+.breakdown-row.total span:last-child{font-family:'Cormorant Garamond',serif;font-size:1.8rem;font-weight:700;color:var(--lagoon)}
+
+.qr-box{display:none;text-align:center;background:var(--sand-light);border-radius:12px;padding:1.25rem;margin-bottom:14px}
+.qr-box.show{display:block}
+.qr-box img{max-width:220px;width:100%;border-radius:10px;box-shadow:var(--shadow)}
+.qr-box p{font-size:12px;color:var(--text-mid);margin-top:8px}
+
+.upload-box{border:1.5px dashed var(--sand);border-radius:9px;padding:16px;text-align:center;margin-bottom:14px;cursor:pointer;background:var(--sand-light)}
+.upload-box.has-file{border-color:var(--success-border);background:var(--success-bg)}
+.upload-box input{display:none}
+.upload-box span{font-size:13px;color:var(--text-mid)}
+
+textarea.inp{resize:vertical;min-height:70px}
+
+.privacy-note{font-size:11px;color:var(--text-muted);line-height:1.6;margin-top:6px;text-align:center}
+
+.submit-btn{width:100%;padding:15px;border-radius:10px;background:var(--lagoon);color:white;border:none;font-size:15px;font-weight:600}
+.submit-btn:disabled{background:var(--sand);color:var(--text-muted)}
+
+.form-err{background:var(--danger-bg);border:1px solid var(--danger-border);color:var(--danger);font-size:13px;padding:10px 12px;border-radius:8px;margin-bottom:14px;display:none}
+
+/* CONFIRMATION VIEW */
+#confirm-view{display:none;text-align:center;padding:3rem 1rem}
+#confirm-view .icon{font-size:3rem;margin-bottom:1rem}
+#confirm-view h2{font-size:1.6rem;color:var(--lagoon);margin-bottom:8px}
+#confirm-view p{font-size:14px;color:var(--text-mid);line-height:1.6;margin-bottom:1.5rem}
+.confirm-signup-box{background:white;border:1px solid var(--sand);border-radius:14px;padding:1.5rem;margin-top:1.5rem;text-align:left}
+.confirm-signup-box h3{font-size:1.1rem;color:var(--lagoon);margin-bottom:6px}
+.confirm-signup-box p{font-size:13px;margin-bottom:14px}
+
+.modal{position:fixed;inset:0;background:rgba(28,46,44,.65);z-index:200;display:none;align-items:center;justify-content:center;padding:1rem}
+.modal.show{display:flex}
+.modal-box{background:white;border-radius:16px;padding:2rem 1.75rem;width:100%;max-width:380px;box-shadow:var(--shadow-lg);position:relative;max-height:90vh;overflow-y:auto}
+.modal-close{position:absolute;top:12px;right:14px;background:var(--sand);border:none;border-radius:50%;width:30px;height:30px;font-size:16px}
+.modal-box h2{font-size:1.5rem;color:var(--lagoon);text-align:center;margin-bottom:1.25rem}
+.auth-tabs{display:flex;background:var(--pearl);border-radius:9px;padding:3px;margin-bottom:1.25rem}
+.auth-tab{flex:1;padding:8px;border:none;background:none;border-radius:7px;font-size:13px;font-weight:500;color:var(--text-muted)}
+.auth-tab.on{background:white;color:var(--lagoon);box-shadow:var(--shadow)}
+.auth-err{background:var(--danger-bg);border:1px solid var(--danger-border);color:var(--danger);font-size:13px;padding:9px 12px;border-radius:8px;margin-bottom:12px;display:none}
+.auth-ok{background:var(--success-bg);border:1px solid var(--success-border);color:var(--success);text-align:center;padding:1.5rem 1rem;border-radius:9px}
+.btn{padding:13px;border-radius:9px;font-size:14px;font-weight:500;border:none;text-align:center;flex:1}
+.btn-p{background:var(--lagoon);color:var(--pearl)}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-inner">
+    <a href="/"><h1>Mike Charlie Co.</h1></a>
+    <button class="auth-link" id="auth-link" onclick="openAuthModal()">Log In / Sign Up</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <a class="back-link" href="/">← Back to shop</a>
+
+  <!-- ACCOUNT BANNER: swapped by JS depending on session state -->
+  <div class="acct-banner" id="acct-banner"></div>
+
+  <div id="checkout-view">
+    <div class="form-err" id="form-err"></div>
+
+    <div class="section">
+      <h2>Order Details</h2>
+      <div id="co-items"></div>
+    </div>
+
+    <div class="section">
+      <h2>Your Details</h2>
+      <label class="lbl">Full Name</label>
+      <input class="inp" id="f-name" placeholder="Full name">
+
+      <label class="lbl">Shipping Address</label>
+      <textarea class="inp" id="f-address" placeholder="Complete shipping address"></textarea>
+
+      <label class="lbl">Contact Number</label>
+      <input class="inp" id="f-contact" placeholder="09XX XXX XXXX">
+
+      <label class="lbl">Preferred Platform for Updates</label>
+      <select class="inp" id="f-platform" onchange="onPlatformChange()">
+        <option value="">Select platform</option>
+        <option value="imessage">iMessage</option>
+        <option value="whatsapp">WhatsApp</option>
+        <option value="viber">Viber</option>
+        <option value="threads">Threads</option>
+        <option value="instagram">Instagram</option>
+      </select>
+      <div class="field-note">This is where we will be reaching out to you with shipping updates and your tracking number. Please keep your account open for messages.</div>
+
+      <div id="handle-field-wrap" style="display:none">
+        <label class="lbl" id="handle-label">Handle</label>
+        <div class="handle-row">
+          <span class="handle-prefix" id="handle-prefix"></span>
+          <input id="f-handle" placeholder="">
+        </div>
+      </div>
+
+      <label class="lbl">Shipping Region</label>
+      <select class="inp" id="f-region" onchange="recalcTotals()">
+        <option value="">Select your region</option>
+      </select>
+    </div>
+
+    <div class="section">
+      <h2>Order Breakdown</h2>
+      <div class="breakdown-row"><span>Subtotal</span><span id="bd-subtotal">₱0.00</span></div>
+      <div class="breakdown-row"><span>Shipping Fee</span><span id="bd-shipping">—</span></div>
+      <div class="breakdown-row total"><span>Total</span><span id="bd-total">₱0.00</span></div>
+    </div>
+
+    <div class="section">
+      <h2>Payment</h2>
+      <label class="lbl">Preferred Mode of Payment</label>
+      <select class="inp" id="f-payment" onchange="onPaymentChange()">
+        <option value="">Select payment method</option>
+        <option value="gcash">GCash</option>
+        <option value="bdo">BDO</option>
+        <option value="gotyme">GoTyme</option>
+        <option value="maribank">Maribank</option>
+        <option value="cimb">CIMB Bank</option>
+        <option value="maya">Maya</option>
+      </select>
+
+      <div class="qr-box" id="qr-box">
+        <img id="qr-img" src="" alt="Payment QR code">
+        <p>Scan this QR in your banking/e-wallet app to pay, then upload proof of payment below.</p>
+      </div>
+
+      <label class="lbl">Upload Proof of Payment</label>
+      <label class="upload-box" id="upload-box">
+        <input type="file" id="f-proof" accept="image/*" onchange="onProofSelected()">
+        <span id="upload-label">Tap to upload a screenshot or photo of your payment</span>
+      </label>
+
+      <label class="lbl">Leave a Note for the Seller (optional)</label>
+      <textarea class="inp" id="f-note" placeholder="Anything you'd like us to know about your order"></textarea>
+    </div>
+
+    <button class="submit-btn" id="submit-btn" onclick="submitOrder()">Submit Order</button>
+    <div class="privacy-note">In compliance with RA 10173 (Data Privacy Act), your delivery details will strictly be used for order fulfillment and shipping purposes only.</div>
+  </div>
+
+  <!-- CONFIRMATION VIEW -->
+  <div id="confirm-view">
+    <div class="icon">🌿</div>
+    <h2>Order received!</h2>
+    <p id="confirm-msg">We'll verify your payment and message you with updates shortly.</p>
+
+    <div class="confirm-signup-box" id="signup-prompt" style="display:none">
+      <h3>Track this order</h3>
+      <p>Create an account to see your order's status anytime — we've already filled in your details.</p>
+      <button class="btn btn-p" style="width:100%" onclick="openSignupFromConfirm()">Create Account</button>
+    </div>
+  </div>
+</div>
+
+<!-- AUTH MODAL -->
+<div id="auth-modal" class="modal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeAuthModal()">✕</button>
+    <div id="auth-content">
+      <h2>Welcome</h2>
+      <div class="auth-tabs">
+        <button class="auth-tab on" id="tab-signin" onclick="setAuthMode('signin')">Log In</button>
+        <button class="auth-tab" id="tab-signup" onclick="setAuthMode('signup')">Sign Up</button>
+      </div>
+      <div class="auth-err" id="auth-err"></div>
+      <label class="lbl">Email</label>
+      <input class="inp" type="email" id="auth-email" placeholder="you@email.com">
+      <label class="lbl">Password</label>
+      <input class="inp" type="password" id="auth-pw" placeholder="••••••••">
+      <button class="btn btn-p" style="width:100%" id="auth-submit" onclick="submitAuth()">Log In</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SB_URL='https://cdczxunygdmswgdzkbed.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkY3p4dW55Z2Rtc3dnZHprYmVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxOTg5NjksImV4cCI6MjEwMjc3NDk2OX0.IrC05NPev5Zp6uV0DMe0gZI3boQsqXuTYSTVdyn8oWg';
+</script>
+<script src="/partials/shipping-rates.js"></script>
+<script src="/partials/shared.js"></script>
+<script src="/partials/checkout.js"></script>
+</body>
+</html>
