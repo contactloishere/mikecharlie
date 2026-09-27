@@ -262,6 +262,12 @@ async function init(){
       s.variantPhotoUrl=photoBySku[s.id]||null;
     });
     S.skus=skus;S.categories=cats;
+    // If already logged in, merge in likes saved on other devices before rendering.
+    const _session=(typeof loadSession==='function')?loadSession():null;
+    if(_session && Date.now()<_session.expires_at){
+      const serverLikes=await fetchServerLikes();
+      if(serverLikes){serverLikes.forEach(id=>S.likes.add(id));saveLikes();}
+    }
     groupProducts();
     renderCatBar();
     renderGrid();
@@ -421,9 +427,11 @@ function quickAddSku(gi,skuId){
   addToCart(skuId,1);
 }
 function toggleLike(skuId,btn){
-  if(S.likes.has(skuId)){S.likes.delete(skuId);btn.textContent='🤍';}
-  else{S.likes.add(skuId);btn.textContent='❤️';}
+  let nowLiked;
+  if(S.likes.has(skuId)){S.likes.delete(skuId);btn.textContent='🤍';nowLiked=false;}
+  else{S.likes.add(skuId);btn.textContent='❤️';nowLiked=true;}
   saveLikes();
+  syncLikeToServer(skuId,nowLiked);
 }
 
 /* ─── INFINITE SCROLL ─── */
@@ -574,9 +582,11 @@ function detailAxis2Change(axis2){
   showDetail(S.currentGroupIdx,idx,true);
 }
 function toggleDetailLike(skuId){
-  if(S.likes.has(skuId)){S.likes.delete(skuId);$('detail-like').textContent='🤍';$('detail-like').classList.remove('liked');}
-  else{S.likes.add(skuId);$('detail-like').textContent='❤️';$('detail-like').classList.add('liked');}
+  let nowLiked;
+  if(S.likes.has(skuId)){S.likes.delete(skuId);$('detail-like').textContent='🤍';$('detail-like').classList.remove('liked');nowLiked=false;}
+  else{S.likes.add(skuId);$('detail-like').textContent='❤️';$('detail-like').classList.add('liked');nowLiked=true;}
   saveLikes();
+  syncLikeToServer(skuId,nowLiked);
 }
 function currentDetailSku(){
   const group=filteredGroups()[S.currentGroupIdx]||S.groups[S.currentGroupIdx];
