@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Account — Mike Charlie Co.</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --lagoon:#3E5F5C;--lagoon-dark:#2C4542;--teal:#729A94;--teal-light:#A8C5C0;
+  --golden:#D1A679;--golden-dark:#B8905F;--sand:#E6D5C3;--sand-light:#F0E8DA;
+  --pearl:#F7F3EC;--white:#FFFFFF;
+  --text-dark:#1C2E2C;--text-mid:#4A6862;--text-muted:#8FA9A4;
+  --danger:#C1121F;--danger-bg:#FFE8E8;--danger-border:#F5A0A0;
+  --success:#2D6A4F;--success-bg:#D8F3DC;--success-border:#A3D9B1;
+  --shadow:0 2px 12px rgba(62,95,92,0.09);
+  --shadow-lg:0 8px 36px rgba(62,95,92,0.18);
+}
+body{font-family:'DM Sans',sans-serif;background:var(--pearl);color:var(--text-dark);min-height:100vh}
+h1,h2,h3{font-family:'Cormorant Garamond',serif}
+button{font-family:'DM Sans',sans-serif;cursor:pointer}
+a{color:inherit}
+
+.hdr{position:sticky;top:0;z-index:90;background:var(--pearl);border-bottom:1px solid var(--sand);padding:1rem 1.25rem}
+.hdr-inner{max-width:900px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.hdr h1{font-size:1.15rem;color:var(--lagoon)}
+.hdr-actions{display:flex;gap:8px;align-items:center}
+.auth-link{background:var(--lagoon);color:var(--pearl);border:none;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:500}
+
+.wrap{max-width:900px;margin:0 auto;padding:1.5rem 1.25rem 4rem}
+
+/* GATE: shown when not logged in */
+#gate{display:none;text-align:center;padding:4rem 1rem}
+#gate h2{font-size:1.6rem;color:var(--lagoon);margin-bottom:10px}
+#gate p{font-size:14px;color:var(--text-mid);margin-bottom:1.5rem}
+#gate button{background:var(--lagoon);color:white;border:none;border-radius:9px;padding:12px 24px;font-size:14px;font-weight:500}
+
+#dashboard{display:none}
+
+/* TABS */
+.tabs{display:flex;gap:4px;background:white;border:1px solid var(--sand);border-radius:12px;padding:4px;margin-bottom:1.5rem;overflow-x:auto}
+.tab-btn{flex:1;white-space:nowrap;padding:10px 14px;border:none;background:none;border-radius:9px;font-size:13px;font-weight:500;color:var(--text-muted)}
+.tab-btn.on{background:var(--lagoon);color:var(--pearl)}
+.tab-panel{display:none}
+.tab-panel.on{display:block}
+
+.card{background:white;border:1px solid var(--sand);border-radius:14px;padding:1.25rem;margin-bottom:1rem}
+.card h2{font-size:1.15rem;color:var(--lagoon);margin-bottom:1rem}
+
+/* PROFILE */
+.lbl{display:block;font-size:13px;color:var(--text-mid);margin-bottom:5px;font-weight:500}
+.inp,select.inp{width:100%;padding:11px 12px;border:1.5px solid var(--sand);border-radius:9px;font-size:14px;margin-bottom:14px;font-family:inherit;background:white}
+.field-note{font-size:11.5px;color:var(--text-muted);margin-top:-10px;margin-bottom:14px;line-height:1.5}
+.handle-row{display:flex;align-items:center;border:1.5px solid var(--sand);border-radius:9px;margin-bottom:14px;overflow:hidden}
+.handle-prefix{padding:11px 4px 11px 12px;font-size:14px;color:var(--text-mid);background:var(--sand-light);white-space:nowrap}
+.handle-row input{border:none;padding:11px 12px 11px 4px;font-size:14px;flex:1;font-family:inherit}
+.handle-row input:focus{outline:none}
+.save-btn{background:var(--lagoon);color:white;border:none;border-radius:9px;padding:12px 24px;font-size:14px;font-weight:500}
+.save-msg{font-size:12.5px;color:var(--success);margin-left:12px;display:none}
+
+/* LIKES */
+.likes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}
+.like-card{border:1px solid var(--sand);border-radius:12px;overflow:hidden;background:white;position:relative}
+.like-img{width:100%;aspect-ratio:1;object-fit:cover;background:var(--sand-light)}
+.like-info{padding:8px 10px}
+.like-name{font-size:12.5px;font-weight:500;line-height:1.3}
+.like-price{font-size:12px;color:var(--lagoon);font-weight:600;margin-top:3px}
+.unheart-btn{position:absolute;top:6px;right:6px;background:rgba(255,255,255,.9);border:none;border-radius:50%;width:28px;height:28px;font-size:14px}
+.empty-note{font-size:13px;color:var(--text-muted);text-align:center;padding:2rem 1rem}
+
+/* ORDERS */
+.order-card{border:1px solid var(--sand);border-radius:14px;padding:1.1rem;margin-bottom:1rem;background:white}
+.order-hdr{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.order-id{font-size:12px;color:var(--text-muted)}
+.order-total{font-size:1rem;font-weight:600;color:var(--lagoon)}
+.order-items-mini{font-size:12.5px;color:var(--text-mid);margin-bottom:12px;line-height:1.6}
+
+.progress-track{position:relative;margin:1.2rem 0 1rem}
+.progress-bar-bg{height:6px;background:var(--sand-light);border-radius:4px;overflow:hidden}
+.progress-bar-fill{height:100%;background:var(--lagoon);border-radius:4px;transition:width .3s}
+.progress-pct{font-size:11.5px;color:var(--text-muted);text-align:right;margin-top:4px}
+
+.stage-list{margin-top:12px}
+.stage-row{display:flex;gap:10px;align-items:flex-start;padding:6px 0}
+.stage-dot{width:18px;height:18px;border-radius:50%;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:10px}
+.stage-dot.done{background:var(--lagoon);color:white}
+.stage-dot.pending{background:var(--sand-light);border:1.5px solid var(--sand)}
+.stage-text{flex:1}
+.stage-label{font-size:13px;font-weight:500}
+.stage-label.pending-label{color:var(--text-muted);font-weight:400}
+.stage-date{font-size:11.5px;color:var(--text-muted)}
+
+.tracking-box{background:var(--sand-light);border-radius:10px;padding:12px 14px;margin-top:8px;font-size:12.5px}
+.tracking-box a{color:var(--lagoon);font-weight:600;text-decoration:underline}
+.tracking-num{background:white;border:1px solid var(--sand);border-radius:6px;padding:6px 10px;font-family:monospace;font-size:13px;display:inline-block;margin:6px 0;user-select:all}
+
+.order-tabs{display:flex;gap:6px;margin-bottom:1rem}
+.order-tab{padding:8px 16px;border-radius:8px;border:1px solid var(--sand);background:white;font-size:13px;font-weight:500;color:var(--text-mid)}
+.order-tab.on{background:var(--lagoon);color:white;border-color:var(--lagoon)}
+
+/* MESSAGE */
+.platform-links{display:flex;flex-direction:column;gap:10px}
+.platform-link{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border:1px solid var(--sand);border-radius:10px;font-size:14px;font-weight:500}
+.platform-link span.arrow{color:var(--text-muted)}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-inner">
+    <a href="/"><h1>Mike Charlie Co.</h1></a>
+    <div class="hdr-actions">
+      <button class="auth-link" id="auth-link" onclick="openAuthModal()">Log In / Sign Up</button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <div id="gate">
+    <h2>My Account</h2>
+    <p>Log in or create an account to view your profile, likes, and orders.</p>
+    <button onclick="openAuthModal()">Log In / Sign Up</button>
+  </div>
+
+  <div id="dashboard">
+    <div class="tabs">
+      <button class="tab-btn on" data-tab="profile" onclick="switchTab('profile')">Profile</button>
+      <button class="tab-btn" data-tab="likes" onclick="switchTab('likes')">Likes</button>
+      <button class="tab-btn" data-tab="orders" onclick="switchTab('orders')">Orders</button>
+      <button class="tab-btn" data-tab="message" onclick="switchTab('message')">Message</button>
+    </div>
+
+    <!-- PROFILE -->
+    <div class="tab-panel on" id="panel-profile">
+      <div class="card">
+        <h2>Your Details</h2>
+        <label class="lbl">Full Name</label>
+        <input class="inp" id="p-name">
+        <label class="lbl">Shipping Address</label>
+        <textarea class="inp" id="p-address" style="min-height:70px"></textarea>
+        <label class="lbl">Contact Number</label>
+        <input class="inp" id="p-contact">
+        <label class="lbl">Preferred Platform for Updates</label>
+        <select class="inp" id="p-platform" onchange="onProfilePlatformChange()">
+          <option value="">Select platform</option>
+          <option value="imessage">iMessage</option>
+          <option value="whatsapp">WhatsApp</option>
+          <option value="viber">Viber</option>
+          <option value="threads">Threads</option>
+          <option value="instagram">Instagram</option>
+        </select>
+        <div id="p-handle-wrap" style="display:none">
+          <label class="lbl" id="p-handle-label">Handle</label>
+          <div class="handle-row">
+            <span class="handle-prefix" id="p-handle-prefix"></span>
+            <input id="p-handle">
+          </div>
+        </div>
+        <button class="save-btn" onclick="saveProfile()">Save Changes</button>
+        <span class="save-msg" id="save-msg">Saved ✓</span>
+      </div>
+    </div>
+
+    <!-- LIKES -->
+    <div class="tab-panel" id="panel-likes">
+      <div class="card">
+        <h2>Your Likes</h2>
+        <div id="likes-grid" class="likes-grid"></div>
+      </div>
+    </div>
+
+    <!-- ORDERS -->
+    <div class="tab-panel" id="panel-orders">
+      <div class="order-tabs">
+        <button class="order-tab on" data-ot="current" onclick="switchOrderTab('current')">Current</button>
+        <button class="order-tab" data-ot="past" onclick="switchOrderTab('past')">Past</button>
+      </div>
+      <div id="orders-list"></div>
+    </div>
+
+    <!-- MESSAGE -->
+    <div class="tab-panel" id="panel-message">
+      <div class="card">
+        <h2>Reach Us</h2>
+        <p style="font-size:13px;color:var(--text-mid);margin-bottom:14px">Message us directly on any of these — we usually reply fastest on the platform you picked for order updates.</p>
+        <div class="platform-links" id="platform-links"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- AUTH MODAL -->
+<div id="auth-modal" class="modal" style="position:fixed;inset:0;background:rgba(28,46,44,.65);z-index:200;display:none;align-items:center;justify-content:center;padding:1rem">
+  <div class="modal-box" style="background:white;border-radius:16px;padding:2rem 1.75rem;width:100%;max-width:380px;box-shadow:var(--shadow-lg);position:relative;max-height:90vh;overflow-y:auto">
+    <button onclick="closeAuthModal()" style="position:absolute;top:12px;right:14px;background:var(--sand);border:none;border-radius:50%;width:30px;height:30px;font-size:16px">✕</button>
+    <div id="auth-content">
+      <h2 style="font-size:1.5rem;color:var(--lagoon);text-align:center;margin-bottom:1.25rem">Welcome</h2>
+      <div class="auth-tabs" style="display:flex;background:var(--pearl);border-radius:9px;padding:3px;margin-bottom:1.25rem">
+        <button class="auth-tab on" onclick="setAuthMode('signin')" style="flex:1;padding:8px;border:none;background:white;border-radius:7px;font-size:13px;font-weight:500;color:var(--lagoon);box-shadow:var(--shadow)">Log In</button>
+        <button class="auth-tab" onclick="setAuthMode('signup')" style="flex:1;padding:8px;border:none;background:none;border-radius:7px;font-size:13px;font-weight:500;color:var(--text-muted)">Sign Up</button>
+      </div>
+      <div class="auth-err" id="auth-err" style="background:var(--danger-bg);border:1px solid var(--danger-border);color:var(--danger);font-size:13px;padding:9px 12px;border-radius:8px;margin-bottom:12px;display:none"></div>
+      <label class="lbl">Email</label>
+      <input class="inp" type="email" id="auth-email" placeholder="you@email.com">
+      <label class="lbl">Password</label>
+      <input class="inp" type="password" id="auth-pw" placeholder="••••••••">
+      <button style="width:100%;padding:13px;border-radius:9px;background:var(--lagoon);color:white;border:none;font-size:14px;font-weight:500" id="auth-submit" onclick="submitAuth()">Log In</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SB_URL='https://cdczxunygdmswgdzkbed.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkY3p4dW55Z2Rtc3dnZHprYmVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxOTg5NjksImV4cCI6MjEwMjc3NDk2OX0.IrC05NPev5Zp6uV0DMe0gZI3boQsqXuTYSTVdyn8oWg';
+</script>
+<script src="/partials/shared.js"></script>
+<script src="/partials/account.js"></script>
+</body>
+</html>
