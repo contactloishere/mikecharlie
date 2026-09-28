@@ -109,11 +109,64 @@ function moCard(o){
 
 function moStamp(o,key){return Object.assign({},o.stage_dates||{},{[key]:new Date().toISOString()});}
 
+// Must match the platform dropdown value used for storefront sales in the Sales tab.
+const MO_SALE_PLATFORM='Website';
+
+function moTodayLocal(){
+  const d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+/* Records the order in the sales ledger and deducts stock.
+   Runs once, when payment is confirmed. */
+async function moRecordSale(o){
+  const items=MO.itemsByOrder[o.id]||[];
+  const total=parseFloat(o.total)||0;
+  const platformFee=0;
+  const [sale]=await sbInsert('sales',{
+    order_id:'MO-'+o.id.slice(0,8),
+    platform:MO_SALE_PLATFORM,
+    sale_date:moTodayLocal(),
+    customer_name:o.customer_name,
+    city_province:o.region_label,
+    address:o.address,
+    payment_method:o.payment_method,
+    subtotal:o.subtotal,
+    platform_fee:platformFee,
+    shipping_fee:o.shipping_fee,
+    total_amount:total,
+    net_profit:total-platformFee,
+    source:'Member order',
+    notes:o.notes||null
+  });
+  try{
+    const rows=items.filter(i=>i.sku_id).map(i=>({
+      sale_id:sale.id,sku_id:i.sku_id,quantity:i.qty,unit_price:i.unit_price,subtotal:i.line_total
+    }));
+    if(rows.length) await sbInsert('sale_items',rows);
+  }catch(e){
+    await sbDelete('sales',`id=eq.${sale.id}`);
+    throw e;
+  }
+  // Deduct stock
+  for(const i of items){
+    if(!i.sku_id)continue;
+    const cur=await sbGet('skus',`id=eq.${i.sku_id}&select=id,current_stock`);
+    if(cur[0]) await sbUpdate('skus',i.sku_id,{current_stock:(cur[0].current_stock||0)-i.qty});
+  }
+  salesCache=null; // make Sales/Home/Reports tabs reload fresh
+  return sale.id;
+}
+
 async function moAdvance(id,stage){
   const o=MO.orders.find(x=>x.id===id);
   try{
-    await sbUpdate('mcc_orders',id,{current_stage:stage,stage_dates:moStamp(o,stage)});
-    toast('✓ Order updated');
+    const patch={current_stage:stage,stage_dates:moStamp(o,stage)};
+    if(stage==='payment_confirmed' && !o.sale_id){
+      patch.sale_id=await moRecordSale(o);
+    }
+    await sbUpdate('mcc_orders',id,patch);
+    toast(stage==='payment_confirmed'?'✓ Payment confirmed, sale recorded, stock updated':'✓ Order updated');
     renderMemberOrders();
   }catch(e){toast('Could not update: '+e.message);}
 }
