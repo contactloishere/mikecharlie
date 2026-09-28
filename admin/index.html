@@ -190,7 +190,7 @@ tbody tr:hover td.frz{background:var(--pearl)}
   <div class="tabs">
     <button class="tab on" onclick="goTab('home',this)">🏠 Home</button>
     <button class="tab" onclick="goTab('takeorder',this)">🛍️ Take Order</button>
-    <button class="tab soon" onclick="soonTab()">🧾 Orders</button>
+    <button class="tab" onclick="goTab('orders',this)">🧾 Member Orders</button>
     <button class="tab" onclick="goTab('inventory',this)">📦 Inventory</button>
     <button class="tab" onclick="goTab('products',this)">🗂️ Products</button>
     <button class="tab" onclick="goTab('sales',this)">💰 Sales</button>
@@ -330,5 +330,6 @@ tbody tr:hover td.frz{background:var(--pearl)}
 <script src="admin/sales-tab.js"></script>
 <script src="admin/reports-tab.js"></script>
 <script src="admin/take-order-tab.js"></script>
+<script src="admin/orders-tab.js"></script>
 </body>
 </html>
