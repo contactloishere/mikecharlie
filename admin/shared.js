@@ -191,6 +191,7 @@ function goTab(name,btn){
   if(name==='sales')renderSalesLog();
   if(name==='reports')renderDataReports();
   if(name==='products')renderProducts();
+  if(name==='orders')renderMemberOrders();
 }
 
 /* ─── LOAD DATA ─── */
