@@ -123,6 +123,12 @@ async function moRecordSale(o){
   const items=MO.itemsByOrder[o.id]||[];
   const total=parseFloat(o.total)||0;
   const platformFee=0;
+  // Net profit for own-site sales = what the customer paid, minus product cost, minus shipping.
+  const skuIds=items.filter(i=>i.sku_id).map(i=>i.sku_id);
+  const skuRows=skuIds.length?await sbGet('skus',`id=in.(${skuIds.join(',')})&select=id,current_stock,unit_cost`):[];
+  const skuById={};skuRows.forEach(r=>skuById[r.id]=r);
+  const productCost=items.reduce((sum,i)=>sum+((skuById[i.sku_id]&&parseFloat(skuById[i.sku_id].unit_cost))||0)*i.qty,0);
+  const netProfit=total-productCost-(parseFloat(o.shipping_fee)||0)-platformFee;
   const [sale]=await sbInsert('sales',{
     order_id:'MO-'+o.id.slice(0,8),
     platform:MO_SALE_PLATFORM,
@@ -135,7 +141,7 @@ async function moRecordSale(o){
     platform_fee:platformFee,
     shipping_fee:o.shipping_fee,
     total_amount:total,
-    net_profit:total-platformFee,
+    net_profit:netProfit,
     source:'Member order',
     notes:o.notes||null
   });
@@ -151,8 +157,8 @@ async function moRecordSale(o){
   // Deduct stock
   for(const i of items){
     if(!i.sku_id)continue;
-    const cur=await sbGet('skus',`id=eq.${i.sku_id}&select=id,current_stock`);
-    if(cur[0]) await sbUpdate('skus',i.sku_id,{current_stock:(cur[0].current_stock||0)-i.qty});
+    const cur=skuById[i.sku_id];
+    if(cur) await sbUpdate('skus',i.sku_id,{current_stock:(cur.current_stock||0)-i.qty});
   }
   salesCache=null; // make Sales/Home/Reports tabs reload fresh
   return sale.id;
