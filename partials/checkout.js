@@ -269,6 +269,43 @@ function validateForm() {
   return null;
 }
 
+/* ─── PROCESSING ANIMATION ─── */
+(function addProcessingStyles() {
+  const css = `
+    @keyframes mccSpin { to { transform: rotate(360deg); } }
+    .mcc-spin { display:inline-block; width:16px; height:16px; margin-right:8px; vertical-align:-3px;
+      border:2.5px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation: mccSpin .8s linear infinite; }
+    #mcc-processing { display:none; margin-top:14px; padding:14px 16px; border-radius:10px; text-align:center;
+      background:#F0E8DA; border:1px solid #E6D5C3; color:#2C4542; font-size:13px; line-height:1.5; }
+    #mcc-processing .mcc-spin-big { display:block; width:34px; height:34px; margin:0 auto 10px;
+      border:3.5px solid #E6D5C3; border-top-color:#3E5F5C; border-radius:50%; animation: mccSpin .9s linear infinite; }
+    #mcc-processing strong { display:block; font-size:14px; margin-bottom:2px; }
+  `;
+  const style = document.createElement('style');
+  style.textContent = css;
+  document.head.appendChild(style);
+})();
+
+function warnBeforeLeaving(e) { e.preventDefault(); e.returnValue = ''; }
+
+function showProcessing() {
+  let box = $('mcc-processing');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'mcc-processing';
+    box.innerHTML = '<span class="mcc-spin-big"></span><strong>Do not close this window.</strong>We are processing your order. This can take a few seconds.';
+    $('submit-btn').insertAdjacentElement('afterend', box);
+  }
+  box.style.display = 'block';
+  window.addEventListener('beforeunload', warnBeforeLeaving);
+}
+
+function hideProcessing() {
+  const box = $('mcc-processing');
+  if (box) box.style.display = 'none';
+  window.removeEventListener('beforeunload', warnBeforeLeaving);
+}
+
 /* ─── SUBMIT ─── */
 async function submitOrder() {
   // Re-check login status right before submitting — catches a customer
@@ -282,7 +319,8 @@ async function submitOrder() {
   errBox.style.display = 'none';
 
   const btn = $('submit-btn'); const orig = btn.textContent;
-  btn.disabled = true; btn.textContent = 'Submitting...';
+  btn.disabled = true; btn.innerHTML = '<span class="mcc-spin"></span>Submitting...';
+  showProcessing();
 
   try {
     CO.proofUrl = await uploadProof();
@@ -365,6 +403,7 @@ async function submitOrder() {
   } catch (e) {
     errBox.textContent = e.message; errBox.style.display = 'block'; window.scrollTo(0, 0);
   } finally {
+    hideProcessing();
     btn.disabled = false; btn.textContent = orig;
   }
 }
