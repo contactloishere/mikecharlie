@@ -288,6 +288,7 @@ async function submitOrder() {
     CO.proofUrl = await uploadProof();
 
     const orderPayload = {
+      id: crypto.randomUUID(),
       customer_id: CO.session ? CO.session.user.id : null,
       customer_name: $('f-name').value.trim(),
       address: $('f-address').value.trim(),
@@ -311,12 +312,16 @@ async function submitOrder() {
         apikey: SB_KEY,
         Authorization: 'Bearer ' + (CO.session ? CO.session.access_token : SB_KEY),
         'Content-Type': 'application/json',
-        Prefer: 'return=representation'
+        Prefer: 'return=minimal'
       },
       body: JSON.stringify(orderPayload)
     });
-    if (!orderRes.ok) throw new Error('Could not submit your order. Please try again.');
-    const [order] = await orderRes.json();
+    if (!orderRes.ok) {
+      const detail = await orderRes.text();
+      console.error('Order save failed:', orderRes.status, detail);
+      throw new Error('Could not submit your order. Please try again. (Details for Lois: ' + orderRes.status + ' ' + detail.slice(0, 200) + ')');
+    }
+    const order = { id: orderPayload.id };
 
     const items = CO.cart.map(item => {
       const sku = CO.skus.find(s => s.id === item.sku_id);
