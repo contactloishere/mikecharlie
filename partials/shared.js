@@ -65,6 +65,44 @@ let authMode = 'signin';
 function saveSession(data) { localStorage.setItem(SESSION_KEY, JSON.stringify({ access_token: data.access_token, refresh_token: data.refresh_token, expires_at: Date.now() + ((data.expires_in || 3600) * 1000), user: data.user })); }
 function loadSession() { try { const raw = localStorage.getItem(SESSION_KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
 function clearSession() { localStorage.removeItem(SESSION_KEY); }
+
+/* ─── STAY LOGGED IN ───
+   The login "pass" (access token) only lasts an hour, but Supabase also
+   gives a long-life "renewal pass" (refresh token). Whenever the short
+   pass is about to run out, we quietly swap it for a new one, so the
+   customer stays logged in on this device until they tap Log Out or clear
+   their browser data. */
+let _refreshing = null;
+async function getFreshSession() {
+  const s = loadSession();
+  if (!s) return null;
+  if (Date.now() < s.expires_at - 60000) return s;      // still good for another minute or more
+  if (!s.refresh_token) { clearSession(); return null; } // old-style login with no renewal pass
+  if (!_refreshing) {
+    _refreshing = (async () => {
+      try {
+        const r = await fetch(`${SB_URL}/auth/v1/token?grant_type=refresh_token`, {
+          method: 'POST',
+          headers: { apikey: SB_KEY, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: s.refresh_token })
+        });
+        const data = await r.json();
+        if (!r.ok || !data.access_token) {
+          // Supabase said no (renewal pass no longer valid): log out properly.
+          if (r.status >= 400 && r.status < 500) clearSession();
+          return null;
+        }
+        saveSession(data);
+        return loadSession();
+      } catch (e) {
+        return null; // no internet right now: keep them logged in, try again next time
+      } finally {
+        _refreshing = null;
+      }
+    })();
+  }
+  return _refreshing;
+}
 function openAuthModal() { const m = document.getElementById('auth-modal'); if (m) m.classList.add('show'); }
 function closeAuthModal() { const m = document.getElementById('auth-modal'); if (m) m.classList.remove('show'); }
 function signInFormHtml() {
@@ -130,7 +168,8 @@ function doLogout() {
 }
 function restoreSessionUI() {
   const session = loadSession();
-  if (session && Date.now() < session.expires_at) {
+  if (session && (session.refresh_token || Date.now() < session.expires_at)) {
+    getFreshSession(); // renew quietly in the background if needed
     const link = document.getElementById('auth-link');
     if (link) {
       link.textContent = 'My Account';
@@ -209,8 +248,8 @@ window.addEventListener('load', handleAuthReturn);
    in Supabase, so likes follow them across devices and show up on
    their account page. */
 async function syncLikeToServer(skuId, liked) {
-  const session = loadSession();
-  if (!session || Date.now() >= session.expires_at) return;
+  const session = await getFreshSession();
+  if (!session) return;
   const headers = { apikey: SB_KEY, Authorization: 'Bearer ' + session.access_token, 'Content-Type': 'application/json' };
   try {
     if (liked) {
@@ -221,8 +260,8 @@ async function syncLikeToServer(skuId, liked) {
   } catch (e) { /* not fatal — local like still saved either way */ }
 }
 async function fetchServerLikes() {
-  const session = loadSession();
-  if (!session || Date.now() >= session.expires_at) return null;
+  const session = await getFreshSession();
+  if (!session) return null;
   try {
     const rows = await fetch(`${SB_URL}/rest/v1/mcc_likes?customer_id=eq.${session.user.id}&select=sku_id`, { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + session.access_token } }).then(r => r.json());
     return rows.map(r => r.sku_id);
