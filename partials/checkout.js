@@ -67,8 +67,8 @@ async function initCheckout() {
   }
 
   // Session check — logged in vs guest
-  CO.session = (typeof loadSession === 'function') ? loadSession() : null;
-  if (CO.session && Date.now() < CO.session.expires_at) {
+  CO.session = (typeof getFreshSession === 'function') ? await getFreshSession() : null;
+  if (CO.session) {
     await loadCustomerProfile();
   } else {
     CO.session = null;
@@ -310,8 +310,7 @@ function hideProcessing() {
 async function submitOrder() {
   // Re-check login status right before submitting — catches a customer
   // who logs in via the header link mid-form, after the page first loaded.
-  const freshSession = (typeof loadSession === 'function') ? loadSession() : null;
-  CO.session = (freshSession && Date.now() < freshSession.expires_at) ? freshSession : null;
+  CO.session = (typeof getFreshSession === 'function') ? await getFreshSession() : null;
 
   const err = validateForm();
   const errBox = $('form-err');
@@ -343,6 +342,33 @@ async function submitOrder() {
       proof_url: CO.proofUrl,
       notes: $('f-note').value.trim() || null
     };
+
+    // Make sure this member has a customer record BEFORE saving the order.
+    // (New members, such as Google sign-ups, do not have one yet.)
+    if (CO.session) {
+      const custRes = await fetch(`${SB_URL}/rest/v1/mcc_customers`, {
+        method: 'POST',
+        headers: {
+          apikey: SB_KEY,
+          Authorization: 'Bearer ' + CO.session.access_token,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates,return=minimal'
+        },
+        body: JSON.stringify({
+          id: CO.session.user.id,
+          full_name: orderPayload.customer_name,
+          address: orderPayload.address,
+          contact_number: orderPayload.contact_number,
+          contact_platform: orderPayload.contact_platform,
+          contact_handle: orderPayload.contact_handle
+        })
+      });
+      if (!custRes.ok) {
+        const detail = await custRes.text();
+        console.error('Customer record failed:', custRes.status, detail);
+        throw new Error('Could not set up your member profile. Please try again. (Details for Lois: ' + custRes.status + ' ' + detail.slice(0, 200) + ')');
+      }
+    }
 
     const orderRes = await fetch(`${SB_URL}/rest/v1/mcc_orders`, {
       method: 'POST',
