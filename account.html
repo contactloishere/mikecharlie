@@ -100,6 +100,13 @@ a{color:inherit}
 .order-tab{padding:8px 16px;border-radius:8px;border:1px solid var(--sand);background:white;font-size:13px;font-weight:500;color:var(--text-mid)}
 .order-tab.on{background:var(--lagoon);color:white;border-color:var(--lagoon)}
 
+/* LOGIN POPUP (this page needs these so the popup can open and look right) */
+#auth-modal.show{display:flex !important}
+.auth-tab.on{background:white !important;color:var(--lagoon) !important;box-shadow:var(--shadow)}
+.auth-ok{background:var(--success-bg);border:1px solid var(--success-border);color:var(--success);text-align:center;padding:1.5rem 1rem;border-radius:9px}
+.btn{padding:13px;border-radius:9px;font-size:14px;font-weight:500;border:none;text-align:center}
+.btn-p{background:var(--lagoon);color:var(--pearl)}
+
 /* MESSAGE */
 .platform-links{display:flex;flex-direction:column;gap:10px}
 .platform-link{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border:1px solid var(--sand);border-radius:10px;font-size:14px;font-weight:500}
@@ -185,7 +192,7 @@ a{color:inherit}
     <div class="tab-panel" id="panel-message">
       <div class="card">
         <h2>Reach Us</h2>
-        <p style="font-size:13px;color:var(--text-mid);margin-bottom:14px">Message us directly on any of these — we usually reply fastest on the platform you picked for order updates.</p>
+        <p style="font-size:13px;color:var(--text-mid);margin-bottom:14px">Message us directly on any of these platforms. Will do our best to reply in 24 hours, or less.</p>
         <div class="platform-links" id="platform-links"></div>
       </div>
     </div>
