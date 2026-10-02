@@ -28,8 +28,8 @@ const PHONE_PLATFORMS = ['imessage', 'whatsapp', 'viber'];
 let ACC = { session: null, profile: null, likes: [], orders: [], orderItemsByOrder: {} };
 
 async function initAccount() {
-  ACC.session = (typeof loadSession === 'function') ? loadSession() : null;
-  if (!ACC.session || Date.now() >= ACC.session.expires_at) {
+  ACC.session = (typeof getFreshSession === 'function') ? await getFreshSession() : null;
+  if (!ACC.session) {
     $('gate').style.display = 'block';
     $('dashboard').style.display = 'none';
     return;
