@@ -64,7 +64,7 @@ const SESSION_KEY = 'mcc_customer_session';
 let authMode = 'signin';
 function saveSession(data) { localStorage.setItem(SESSION_KEY, JSON.stringify({ access_token: data.access_token, refresh_token: data.refresh_token, expires_at: Date.now() + ((data.expires_in || 3600) * 1000), user: data.user })); }
 function loadSession() { try { const raw = localStorage.getItem(SESSION_KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
-function clearSession() { localStorage.removeItem(SESSION_KEY); }
+function clearSession() { localStorage.removeItem(SESSION_KEY); localStorage.removeItem('mcc_display_name'); }
 
 /* ─── STAY LOGGED IN ───
    The login "pass" (access token) only lasts an hour, but Supabase also
@@ -103,7 +103,13 @@ async function getFreshSession() {
   }
   return _refreshing;
 }
-function openAuthModal() { const m = document.getElementById('auth-modal'); if (m) m.classList.add('show'); }
+function openAuthModal() {
+  const m = document.getElementById('auth-modal');
+  if (!m) return;
+  if (isLoggedIn()) { showLoggedInState(loadSession().user.email); }
+  else { setAuthMode(authMode); }   // always draws the newest form, including the Google button
+  m.classList.add('show');
+}
 function closeAuthModal() { const m = document.getElementById('auth-modal'); if (m) m.classList.remove('show'); }
 function signInFormHtml() {
   return `<h2>Welcome</h2><div class="auth-tabs"><button class="auth-tab on" onclick="setAuthMode('signin')">Log In</button><button class="auth-tab" onclick="setAuthMode('signup')">Sign Up</button></div>
@@ -154,29 +160,87 @@ async function submitAuth() {
   finally { btn.textContent = orig; btn.disabled = false; }
 }
 function showLoggedInState(email) {
-  const link = document.getElementById('auth-link');
-  if (link) link.textContent = 'My Account';
+  renderHeaderAuth();
   document.getElementById('auth-content').innerHTML = `<div class="auth-ok"><h3>Welcome back! 🌿</h3><p>Logged in as <strong>${email}</strong>.</p></div><button class="btn btn-p" style="width:100%;margin-top:14px" onclick="doLogout()">Log Out</button>`;
 }
 function doLogout() {
   clearSession();
-  const link = document.getElementById('auth-link');
-  if (link) link.textContent = 'Log In / Sign Up';
   authMode = 'signin';
-  document.getElementById('auth-content').innerHTML = signInFormHtml();
+  const content = document.getElementById('auth-content');
+  if (content) content.innerHTML = signInFormHtml();
   closeAuthModal();
+  const menu = document.getElementById('acct-menu');
+  if (menu) menu.remove();
+  if (window.location.pathname.indexOf('account') !== -1) window.location.href = '/';
+  else window.location.reload();   // refresh the page so everything shows the logged-out view
 }
-function restoreSessionUI() {
-  const session = loadSession();
-  if (session && (session.refresh_token || Date.now() < session.expires_at)) {
-    getFreshSession(); // renew quietly in the background if needed
-    const link = document.getElementById('auth-link');
-    if (link) {
-      link.textContent = 'My Account';
-      link.onclick = function () { openAuthModal(); showLoggedInState(session.user.email); };
-    }
+/* ─── HEADER: SHOW WHO IS LOGGED IN ───
+   Logged out: the button says "Log In / Sign Up".
+   Logged in:  it says "Hi, Lois" and opens a small menu
+               (My Account, My Orders, Log Out). */
+function isLoggedIn() {
+  const s = loadSession();
+  return !!(s && (s.refresh_token || Date.now() < s.expires_at));
+}
+function firstNameOf(session) {
+  const meta = (session && session.user && session.user.user_metadata) || {};
+  const full = meta.full_name || meta.name || localStorage.getItem('mcc_display_name') || '';
+  return full.trim().split(/\s+/)[0] || '';
+}
+function renderHeaderAuth() {
+  const btn = document.getElementById('auth-link');
+  const mnav = document.getElementById('mnav-auth');
+  if (!isLoggedIn()) {
+    if (btn) { btn.textContent = 'Log In / Sign Up'; btn.onclick = openAuthModal; }
+    return;
   }
+  getFreshSession(); // renew quietly in the background if needed
+  const first = firstNameOf(loadSession());
+  if (btn) {
+    btn.textContent = first ? 'Hi, ' + first + ' \u25BE' : 'My Account \u25BE';
+    btn.onclick = toggleAccountMenu;
+  }
+  if (mnav) {
+    mnav.innerHTML = '<a href="/account.html">My Account</a><a href="/account.html#orders">My Orders</a><button class="mnav-item" onclick="closeMobileNav();doLogout()">Log Out</button>';
+  }
+  if (!first) fetchDisplayName();
 }
+// Email sign-ups have no name from Google, so use the name saved on their profile
+async function fetchDisplayName() {
+  try {
+    const s = await getFreshSession();
+    if (!s) return;
+    const rows = await fetch(`${SB_URL}/rest/v1/mcc_customers?id=eq.${s.user.id}&select=full_name`, {
+      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + s.access_token }
+    }).then(r => r.json());
+    const name = rows && rows[0] && rows[0].full_name;
+    if (name) { localStorage.setItem('mcc_display_name', name); renderHeaderAuth(); }
+  } catch (e) {}
+}
+function toggleAccountMenu(e) {
+  if (e) e.stopPropagation();
+  const existing = document.getElementById('acct-menu');
+  if (existing) { existing.remove(); return; }
+  const btn = document.getElementById('auth-link');
+  if (!btn) return;
+  const r = btn.getBoundingClientRect();
+  const menu = document.createElement('div');
+  menu.id = 'acct-menu';
+  menu.style.cssText = 'position:fixed;top:' + (r.bottom + 6) + 'px;right:' + Math.max(12, window.innerWidth - r.right) + 'px;min-width:170px;background:#fff;border:1px solid #E6D5C3;border-radius:10px;box-shadow:0 8px 36px rgba(62,95,92,.18);padding:6px;z-index:150;font-family:\'DM Sans\',sans-serif';
+  menu.innerHTML = '<a href="/account.html">My Account</a><a href="/account.html#orders">My Orders</a><button type="button" onclick="doLogout()">Log Out</button>';
+  document.body.appendChild(menu);
+}
+(function addAccountMenuStyles() {
+  const st = document.createElement('style');
+  st.textContent = '#acct-menu a,#acct-menu button{display:block;width:100%;text-align:left;padding:10px 12px;border:none;background:none;border-radius:7px;font-size:14px;color:#1C2E2C;text-decoration:none;cursor:pointer;font-family:inherit}#acct-menu a:hover,#acct-menu button:hover{background:#F0E8DA}';
+  document.head.appendChild(st);
+})();
+document.addEventListener('click', e => { const m = document.getElementById('acct-menu'); if (m && !m.contains(e.target)) m.remove(); });
+window.addEventListener('scroll', () => { const m = document.getElementById('acct-menu'); if (m) m.remove(); }, { passive: true });
+// Pages with their own built-in header (like checkout) need this; pages using the header partial are handled in loadSharedParts
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', renderHeaderAuth);
+else renderHeaderAuth();
+function restoreSessionUI() { renderHeaderAuth(); }
 
 /* ─── GOOGLE SIGN-IN ───
    The customer taps the button, goes to Google, picks their Gmail, and
