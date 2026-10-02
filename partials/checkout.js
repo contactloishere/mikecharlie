@@ -136,6 +136,13 @@ function recalcTotals() {
   $('bd-total').textContent = P(CO.subtotal + fee);
 }
 
+/* ─── CONTACT NUMBER: digits only, 11 max ─── */
+(function limitContactNumber() {
+  const el = document.getElementById('f-contact');
+  if (!el) return;
+  el.addEventListener('input', () => { el.value = el.value.replace(/\D/g, '').slice(0, 11); });
+})();
+
 /* ─── PLATFORM / HANDLE LOGIC ─── */
 function onPlatformChange() {
   const platform = $('f-platform').value;
@@ -146,13 +153,17 @@ function onPlatformChange() {
   if (!platform) { wrap.style.display = 'none'; return; }
   wrap.style.display = 'block';
   if (PHONE_PLATFORMS.includes(platform)) {
-    $('handle-label').textContent = 'Phone number for updates';
+    $('handle-label').innerHTML = 'Phone number for updates <span class="req">*</span>';
     prefixEl.textContent = '+639';
-    input.placeholder = '17 123 4567';
-    input.oninput = () => { input.value = input.value.replace(/\D/g, ''); };
+    input.placeholder = '171234567';
+    input.maxLength = 9;
+    input.setAttribute('inputmode', 'numeric');
+    input.oninput = () => { input.value = input.value.replace(/\D/g, '').slice(0, 9); };
   } else {
-    $('handle-label').textContent = 'Handle';
+    $('handle-label').innerHTML = 'Handle <span class="req">*</span>';
     prefixEl.textContent = '@';
+    input.removeAttribute('maxlength');
+    input.removeAttribute('inputmode');
     input.placeholder = 'yourhandle';
     // Letters, numbers, periods, underscores — matches real IG/Threads handle rules
     input.oninput = () => { input.value = input.value.replace(/[^a-zA-Z0-9._]/g, ''); };
@@ -203,7 +214,7 @@ function prefillFromGuestStorage() {
     if (!saved) return;
     $('f-name').value = saved.full_name || '';
     $('f-address').value = saved.address || '';
-    $('f-contact').value = saved.contact_number || '';
+    $('f-contact').value = (saved.contact_number || '').replace(/\D/g, '').slice(0, 11);
     if (saved.platform) { $('f-platform').value = saved.platform; onPlatformChange(); $('f-handle').value = (saved.handle || '').replace(/^(\+639|@)/, ''); }
     if (saved.region_id) $('f-region').value = saved.region_id;
   } catch (e) {}
@@ -229,7 +240,7 @@ async function loadCustomerProfile() {
     if (CO.profile) {
       $('f-name').value = CO.profile.full_name || '';
       $('f-address').value = CO.profile.address || '';
-      $('f-contact').value = CO.profile.contact_number || '';
+      $('f-contact').value = (CO.profile.contact_number || '').replace(/\D/g, '').slice(0, 11);
       if (CO.profile.contact_platform) {
         $('f-platform').value = CO.profile.contact_platform;
         onPlatformChange();
@@ -262,7 +273,9 @@ function validateForm() {
   const payment = $('f-payment').value;
 
   if (!CO.cart.length) return 'Your tote bag is empty.';
-  if (!name || !address || !contact || !platform || !handle || !region) return 'Please fill out all fields in Your Details.';
+  if (!name || !address || !contact || !platform || !handle || !region) return 'Please fill out all fields marked with an asterisk (*).';
+  if (!/^\d{11}$/.test(contact)) return 'Contact number must be exactly 11 digits, for example 09171234567.';
+  if (PHONE_PLATFORMS.includes(platform) && !/^\d{9}$/.test(handle)) return 'Please enter the 9 digits that come after +639 for your phone number for updates.';
   if (!payment) return 'Please select a mode of payment.';
   if (!proofFile) return 'Please upload proof of payment.';
   if (CO.shippingFee == null) return 'We couldn\'t calculate shipping for that region/weight — please contact us directly for a manual quote.';
