@@ -70,6 +70,8 @@ function closeAuthModal() { const m = document.getElementById('auth-modal'); if 
 function signInFormHtml() {
   return `<h2>Welcome</h2><div class="auth-tabs"><button class="auth-tab on" onclick="setAuthMode('signin')">Log In</button><button class="auth-tab" onclick="setAuthMode('signup')">Sign Up</button></div>
     <div class="auth-err" id="auth-err"></div>
+    ${googleButtonHtml()}
+    <div style="display:flex;align-items:center;gap:10px;margin:14px 0 12px;color:#8FA9A4;font-size:12px"><div style="flex:1;height:1px;background:#E6D5C3"></div>or use email<div style="flex:1;height:1px;background:#E6D5C3"></div></div>
     <label class="lbl">Email</label><input class="inp" type="email" id="auth-email" placeholder="you@email.com">
     <label class="lbl">Password</label><input class="inp" type="password" id="auth-pw" placeholder="••••••••">
     <button class="btn btn-p" style="width:100%" id="auth-submit" onclick="submitAuth()">Log In</button>`;
@@ -77,6 +79,8 @@ function signInFormHtml() {
 function signUpFormHtml() {
   return `<h2>Welcome</h2><div class="auth-tabs"><button class="auth-tab" onclick="setAuthMode('signin')">Log In</button><button class="auth-tab on" onclick="setAuthMode('signup')">Sign Up</button></div>
     <div class="auth-err" id="auth-err"></div>
+    ${googleButtonHtml()}
+    <div style="display:flex;align-items:center;gap:10px;margin:14px 0 12px;color:#8FA9A4;font-size:12px"><div style="flex:1;height:1px;background:#E6D5C3"></div>or use email<div style="flex:1;height:1px;background:#E6D5C3"></div></div>
     <label class="lbl">Email</label><input class="inp" type="email" id="auth-email" placeholder="you@email.com">
     <label class="lbl">Password</label><input class="inp" type="password" id="auth-pw" placeholder="••••••••">
     <button class="btn btn-p" style="width:100%" id="auth-submit" onclick="submitAuth()">Create Account</button>`;
@@ -134,6 +138,70 @@ function restoreSessionUI() {
     }
   }
 }
+
+/* ─── GOOGLE SIGN-IN ───
+   The customer taps the button, goes to Google, picks their Gmail, and
+   Google sends them back to the site's home page with a login pass in
+   the web address. handleAuthReturn() picks that pass up, saves the
+   login, then sends them to the page they were heading to. */
+function googleButtonHtml() {
+  return `<button type="button" onclick="signInWithGoogle()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:12px;border-radius:9px;background:#fff;color:#1C2E2C;border:1.5px solid #E6D5C3;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit">
+    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.6 5.9c4.4-4.1 7-10.1 7-17.6z"/><path fill="#FBBC05" d="M10.5 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.2.8-4.7l-7.9-6.1C.9 16.4 0 20.1 0 24s.9 7.6 2.6 10.8l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>
+    Continue with Google</button>`;
+}
+function signInWithGoogle() {
+  // Remember where to send them after they come back from Google
+  try {
+    localStorage.setItem('mcc_after_auth', JSON.stringify({
+      checkout: !!window._proceedToCheckoutAfterAuth,
+      back: window.location.pathname + window.location.search
+    }));
+  } catch (e) {}
+  const redirect = encodeURIComponent(window.location.origin + '/');
+  window.location.href = `${SB_URL}/auth/v1/authorize?provider=google&redirect_to=${redirect}`;
+}
+async function handleAuthReturn() {
+  const hash = window.location.hash;
+  if (!hash || hash.length < 2) return;
+  const params = new URLSearchParams(hash.slice(1));
+
+  if (params.get('error')) {
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+    alert('Google sign in was cancelled or did not finish. Please try again.');
+    return;
+  }
+
+  const access_token = params.get('access_token');
+  if (!access_token) return; // just a normal page link, nothing to do
+
+  try {
+    const r = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + access_token } });
+    if (!r.ok) throw new Error('user lookup failed');
+    const user = await r.json();
+    saveSession({
+      access_token,
+      refresh_token: params.get('refresh_token'),
+      expires_in: parseInt(params.get('expires_in') || '3600', 10),
+      user
+    });
+  } catch (e) {
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+    alert('Sign in did not finish. Please try again.');
+    return;
+  }
+
+  await migrateGuestLikesToServer();
+
+  let dest = '/';
+  try {
+    const saved = JSON.parse(localStorage.getItem('mcc_after_auth') || 'null');
+    localStorage.removeItem('mcc_after_auth');
+    if (saved) dest = saved.checkout ? '/checkout.html' : (saved.back || '/');
+  } catch (e) {}
+  if (!dest.startsWith('/') || dest.startsWith('//')) dest = '/';
+  window.location.replace(dest); // also clears the long login pass from the address bar
+}
+window.addEventListener('load', handleAuthReturn);
 
 /* ─── LIKES SYNC (server-side, for logged-in customers) ───
    Guests keep using localStorage only (S.likes in index.html). Once
