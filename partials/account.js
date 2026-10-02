@@ -66,6 +66,10 @@ async function loadProfile() {
       onProfilePlatformChange();
       $('p-handle').value = (ACC.profile.contact_handle || '').replace(/^(\+639|@)/, '');
     }
+  } else {
+    // Brand new member (for example, signed up with Google): pre-fill their name
+    const meta = (ACC.session.user && ACC.session.user.user_metadata) || {};
+    if (meta.full_name) $('p-name').value = meta.full_name;
   }
 }
 
