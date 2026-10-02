@@ -36,11 +36,14 @@ async function initAccount() {
   }
   $('gate').style.display = 'none';
   $('dashboard').style.display = 'block';
-  $('auth-link').textContent = 'Log Out';
-  $('auth-link').onclick = doLogout;
+  if (typeof renderHeaderAuth === 'function') renderHeaderAuth();
 
   renderPlatformLinks();
   await Promise.all([loadProfile(), loadLikes(), loadOrders()]);
+
+  // Links like /account.html#orders open straight on that tab
+  const wanted = window.location.hash.replace('#', '');
+  if (wanted && document.getElementById('panel-' + wanted)) switchTab(wanted);
 }
 
 function sbHeaders() {
