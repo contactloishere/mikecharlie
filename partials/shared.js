@@ -364,6 +364,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 function openAccountChoice() {
+  // Already logged in? No need to ask, go straight to checkout.
+  if (isLoggedIn()) { window.location.href = '/checkout.html'; return; }
   closeCart();
   const el = document.getElementById('account-choice-modal');
   if (el) el.style.display = 'flex';
