@@ -245,7 +245,7 @@ function renderAcctBanner() {
   const el = $('acct-banner');
   if (CO.session) {
     el.className = 'acct-banner signed-in';
-    el.innerHTML = `<p>Signed in as <strong>${CO.session.user.email}</strong> — this order will be saved to your account.</p>`;
+    el.innerHTML = `<p>Checking out as <strong>${CO.session.user.email}</strong>. This order will be saved to your account.</p><button type="button" onclick="doLogout()">Not you? Log out</button>`;
   } else {
     el.style.display = 'none';
   }
@@ -439,6 +439,10 @@ function showConfirmation() {
   $('acct-banner').style.display = 'none';
   $('confirm-view').style.display = 'block';
   if (!CO.session) $('signup-prompt').style.display = 'block';
+  else if (!$('view-order-btn')) {
+    $('confirm-view').insertAdjacentHTML('beforeend',
+      '<a id="view-order-btn" class="btn btn-p" href="/account.html#orders" style="display:block;max-width:320px;margin:0 auto;text-decoration:none">View my order</a>');
+  }
 }
 
 function openSignupFromConfirm() {
