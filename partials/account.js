@@ -19,8 +19,9 @@ const CONTACT_PLATFORMS = [
   { key: 'instagram', label: 'Instagram', url: 'https://www.instagram.com/mikecharlieco/' },
   { key: 'threads', label: 'Threads', url: 'https://www.threads.com/mikecharlieco/' },
   { key: 'whatsapp', label: 'WhatsApp', url: 'https://wa.me/message/T7LXVS3L74A5C1' },
-  { key: 'viber', label: 'Viber', url: 'viber://chat?number=639760467782' },
-  { key: 'imessage', label: 'iMessage', url: 'sms:+639760467782' }
+  { key: 'viber', label: 'Viber', url: 'viber://add?number=639760467782' },
+  { key: 'imessage', label: 'iMessage', url: 'sms:+639760467782' },
+  { key: 'messenger', label: 'Messenger', url: 'https://m.me/mikecharlieco' }
 ];
 
 const PHONE_PLATFORMS = ['imessage', 'whatsapp', 'viber'];
@@ -46,6 +47,16 @@ async function initAccount() {
   if (wanted && document.getElementById('panel-' + wanted)) switchTab(wanted);
 }
 
+// Contact number: digits only, 11 max
+(function limitProfileContact() {
+  const el = document.getElementById('p-contact');
+  if (!el) return;
+  el.maxLength = 11;
+  el.setAttribute('inputmode', 'numeric');
+  el.placeholder = '09XXXXXXXXX';
+  el.addEventListener('input', () => { el.value = el.value.replace(/\D/g, '').slice(0, 11); });
+})();
+
 function sbHeaders() {
   return { apikey: SB_KEY, Authorization: 'Bearer ' + ACC.session.access_token, 'Content-Type': 'application/json' };
 }
@@ -63,7 +74,7 @@ async function loadProfile() {
   if (ACC.profile) {
     $('p-name').value = ACC.profile.full_name || '';
     $('p-address').value = ACC.profile.address || '';
-    $('p-contact').value = ACC.profile.contact_number || '';
+    $('p-contact').value = (ACC.profile.contact_number || '').replace(/\D/g, '').slice(0, 11);
     if (ACC.profile.contact_platform) {
       $('p-platform').value = ACC.profile.contact_platform;
       onProfilePlatformChange();
@@ -86,10 +97,14 @@ function onProfilePlatformChange() {
   if (PHONE_PLATFORMS.includes(platform)) {
     $('p-handle-label').textContent = 'Phone number for updates';
     prefixEl.textContent = '+639';
-    input.oninput = () => { input.value = input.value.replace(/\D/g, ''); };
+    input.maxLength = 9;
+    input.setAttribute('inputmode', 'numeric');
+    input.oninput = () => { input.value = input.value.replace(/\D/g, '').slice(0, 9); };
   } else {
     $('p-handle-label').textContent = 'Handle';
     prefixEl.textContent = '@';
+    input.removeAttribute('maxlength');
+    input.removeAttribute('inputmode');
     input.oninput = () => { input.value = input.value.replace(/[^a-zA-Z0-9._]/g, ''); };
   }
 }
@@ -173,8 +188,10 @@ function renderOrderCard(order) {
   const currentIdx = STAGES.indexOf(order.current_stage); // 1..4
   const pct = Math.round((currentIdx / (STAGES.length - 1)) * 100);
 
+  // Customers only see steps that have happened so far. Future steps stay hidden.
   const stageRows = STAGES.map((key, i) => {
-    const done = i <= currentIdx;
+    if (i > currentIdx) return '';
+    const done = true;
     const date = order.stage_dates && order.stage_dates[key];
     let label = STAGE_LABELS[key];
     if (key === 'shipped' && order.courier) label = `Order picked up by ${order.courier === 'spx' ? 'SPX' : 'J&T'}`;
