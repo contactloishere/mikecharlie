@@ -1,3 +1,8 @@
+<style>
+  /* No underlines on any header links. Active page is bold, others are plain. */
+  .hdr-nav-links a, .hdr-nav-links a:hover, .mobile-nav-overlay a, .mobile-nav-overlay a:hover { text-decoration: none !important; }
+  .hdr-nav-links a { border-bottom: none !important; }
+</style>
 <div class="hdr">
   <div class="hdr-inner">
     <div style="display:flex;align-items:center;gap:1.8rem;flex-wrap:wrap">
@@ -21,7 +26,7 @@
   <a href="/">Shop</a>
   <a href="/hotel-partner-program">Hotel Partner Program</a>
   <a href="/?category=preloved">Preloved Clearance Sale</a>
-  <div id="mnav-auth"><button class="mnav-item" onclick="closeMobileNav();openAuthModal()">Log In / Sign Up</button></div>
+  <div id="mnav-auth" style="display:contents"><button class="mnav-item" onclick="closeMobileNav();openAuthModal()">Log In / Sign Up</button></div>
 </div>
 
 <script>
@@ -36,11 +41,19 @@
     const isPrelovedLink = a.dataset.nav === 'preloved' && isPreloved;
     if (isShop || isHotel || isPrelovedLink) {
       a.style.color = 'var(--lagoon)';
-      a.style.fontWeight = '600';
+      a.style.fontWeight = '700';
     } else {
       a.style.color = 'var(--text-mid)';
-      a.style.fontWeight = '500';
+      a.style.fontWeight = '400';
     }
+  });
+  // Same idea in the mobile menu: active page bold, everything else plain
+  document.querySelectorAll('.mobile-nav-overlay a').forEach(a=>{
+    const href = a.getAttribute('href') || '';
+    const isShop = href === '/' && (path === '' || path === '/') && !isPreloved;
+    const isHotel = href.includes('hotel-partner-program') && path.includes('hotel-partner-program');
+    const isPrelovedLink = href.includes('category=preloved') && isPreloved;
+    a.style.fontWeight = (isShop || isHotel || isPrelovedLink) ? '700' : '400';
   });
 })();
 </script>
