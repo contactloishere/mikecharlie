@@ -95,13 +95,13 @@ function onProfilePlatformChange() {
   if (!platform) { wrap.style.display = 'none'; return; }
   wrap.style.display = 'block';
   if (PHONE_PLATFORMS.includes(platform)) {
-    $('p-handle-label').textContent = 'Phone number for updates';
+    $('p-handle-label').innerHTML = 'Phone number for updates <span class="req">*</span>';
     prefixEl.textContent = '+639';
     input.maxLength = 9;
     input.setAttribute('inputmode', 'numeric');
     input.oninput = () => { input.value = input.value.replace(/\D/g, '').slice(0, 9); };
   } else {
-    $('p-handle-label').textContent = 'Handle';
+    $('p-handle-label').innerHTML = 'Handle <span class="req">*</span>';
     prefixEl.textContent = '@';
     input.removeAttribute('maxlength');
     input.removeAttribute('inputmode');
@@ -110,25 +110,46 @@ function onProfilePlatformChange() {
 }
 
 async function saveProfile() {
+  const msg = $('save-msg');
+  const showMsg = (text, ok) => {
+    msg.textContent = text;
+    msg.style.color = ok ? 'var(--success)' : 'var(--danger)';
+    msg.style.display = 'inline';
+    clearTimeout(msg._t);
+    msg._t = setTimeout(() => msg.style.display = 'none', ok ? 2500 : 5000);
+  };
+
+  const name = $('p-name').value.trim();
+  const address = $('p-address').value.trim();
+  const contact = $('p-contact').value.trim();
   const platform = $('p-platform').value;
   const rawHandle = $('p-handle').value.trim();
-  const handle = platform ? (PHONE_PLATFORMS.includes(platform) ? '+639' + rawHandle : '@' + rawHandle) : null;
 
+  if (!name || !address || !contact || !platform || !rawHandle) return showMsg('Please fill out all fields marked with *.', false);
+  if (!/^\d{11}$/.test(contact)) return showMsg('Contact number must be exactly 11 digits.', false);
+  if (PHONE_PLATFORMS.includes(platform) && !/^\d{9}$/.test(rawHandle)) return showMsg('Enter the 9 digits that come after +639.', false);
+
+  const handle = PHONE_PLATFORMS.includes(platform) ? '+639' + rawHandle : '@' + rawHandle;
   const payload = {
     id: ACC.session.user.id,
-    full_name: $('p-name').value.trim(),
-    address: $('p-address').value.trim(),
-    contact_number: $('p-contact').value.trim(),
-    contact_platform: platform || null,
+    full_name: name,
+    address: address,
+    contact_number: contact,
+    contact_platform: platform,
     contact_handle: handle
   };
-  const r = await fetch(`${SB_URL}/rest/v1/mcc_customers`, {
-    method: 'POST',
-    headers: { ...sbHeaders(), Prefer: 'resolution=merge-duplicates' },
-    body: JSON.stringify(payload)
-  });
-  const msg = $('save-msg');
-  if (r.ok) { msg.style.display = 'inline'; setTimeout(() => msg.style.display = 'none', 2500); }
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/mcc_customers`, {
+      method: 'POST',
+      headers: { ...sbHeaders(), Prefer: 'resolution=merge-duplicates' },
+      body: JSON.stringify(payload)
+    });
+    if (r.ok) {
+      localStorage.setItem('mcc_display_name', name);
+      if (typeof renderHeaderAuth === 'function') renderHeaderAuth();
+      showMsg('Saved \u2713', true);
+    } else showMsg('Could not save. Please try again.', false);
+  } catch (e) { showMsg('Could not save. Please check your connection.', false); }
 }
 
 /* ─── LIKES ─── */
@@ -172,63 +193,156 @@ async function loadOrders() {
 }
 
 function switchOrderTab(which) {
+  ACC.orderTab = which;
+  const tabs = document.querySelector('.order-tabs');
+  if (tabs) tabs.style.display = 'flex';
   document.querySelectorAll('.order-tab').forEach(b => b.classList.toggle('on', b.dataset.ot === which));
   const filtered = ACC.orders.filter(o => which === 'current' ? o.current_stage !== 'shipped' : o.current_stage === 'shipped');
   if (!filtered.length) {
     $('orders-list').innerHTML = `<div class="empty-note">No ${which} orders.</div>`;
     return;
   }
-  $('orders-list').innerHTML = filtered.map(renderOrderCard).join('');
+  $('orders-list').innerHTML = filtered.map(renderOrderSummary).join('');
 }
 
-function renderOrderCard(order) {
+/* ─── small helpers for the order screens ─── */
+const PAYMENT_LABELS = { gcash: 'GCash', bdo: 'BDO', gotyme: 'GoTyme', maribank: 'Maribank', cimb: 'CIMB Bank', maya: 'Maya' };
+const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmtDate = d => d ? new Date(d).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+
+function currentStatusLabel(order) {
+  if (order.current_stage === 'shipped' && order.courier) return `Order picked up by ${order.courier === 'spx' ? 'SPX' : 'J&T'}`;
+  return STAGE_LABELS[order.current_stage] || 'Order placed';
+}
+function thumbHtml(item, cls) {
+  // Small picture of the product. If the picture is missing or fails to load, an empty soft box shows instead.
+  if (!item.cover_image_url) return `<div class="${cls}"></div>`;
+  return `<img class="${cls}" src="${esc(item.cover_image_url)}" alt="" loading="lazy" decoding="async" onerror="this.style.visibility='hidden'">`;
+}
+
+/* ─── ORDER LIST CARD (short version, tap to open) ─── */
+function renderOrderSummary(order) {
   const items = ACC.orderItemsByOrder[order.id] || [];
-  const itemsLine = items.map(i => `${i.product_name}${i.variant ? ' (' + i.variant + ')' : ''} ×${i.qty}`).join(', ');
+  const thumbs = items.slice(0, 4).map(it => thumbHtml(it, 'thumb')).join('');
+  const more = items.length > 4 ? `<span class="thumb-more">+${items.length - 4}</span>` : '';
+  const count = items.reduce((s, i) => s + (i.qty || 0), 0);
+  const idx = STAGES.indexOf(order.current_stage);
+  const pill = idx >= 4 ? 'pill-ship' : idx >= 2 ? 'pill-ok' : 'pill-wait';
+  return `<div class="order-card clickable" onclick="openOrderDetail('${order.id}')">
+    <div class="order-hdr">
+      <span class="order-id">Order #${order.id.slice(0, 8)} &middot; ${fmtDate(order.created_at)}</span>
+      <span class="status-pill ${pill}">${esc(currentStatusLabel(order))}</span>
+    </div>
+    <div class="order-thumbs">${thumbs}${more}</div>
+    <div class="order-sum-row">
+      <span class="order-items-mini">${count} item${count === 1 ? '' : 's'}</span>
+      <span class="order-total">${P(order.total)}</span>
+    </div>
+    <div class="view-link">View order details &rsaquo;</div>
+  </div>`;
+}
 
-  const currentIdx = STAGES.indexOf(order.current_stage); // 1..4
-  const pct = Math.round((currentIdx / (STAGES.length - 1)) * 100);
+/* ─── ORDER DETAIL PAGE ─── */
+function openOrderDetail(orderId) {
+  const order = ACC.orders.find(o => o.id === orderId);
+  if (!order) return;
+  const tabs = document.querySelector('.order-tabs');
+  if (tabs) tabs.style.display = 'none';
+  $('orders-list').innerHTML = renderOrderDetail(order);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function closeOrderDetail() {
+  switchOrderTab(ACC.orderTab || 'current');
+}
 
+function buildStageRows(order) {
+  const currentIdx = STAGES.indexOf(order.current_stage);
   // Customers only see steps that have happened so far. Future steps stay hidden.
-  const stageRows = STAGES.map((key, i) => {
+  return STAGES.map((key, i) => {
     if (i > currentIdx) return '';
-    const done = true;
     const date = order.stage_dates && order.stage_dates[key];
     let label = STAGE_LABELS[key];
     if (key === 'shipped' && order.courier) label = `Order picked up by ${order.courier === 'spx' ? 'SPX' : 'J&T'}`;
     return `<div class="stage-row">
-      <div class="stage-dot ${done ? 'done' : 'pending'}">${done ? '✓' : ''}</div>
+      <div class="stage-dot done">&#10003;</div>
       <div class="stage-text">
-        <div class="stage-label ${done ? '' : 'pending-label'}">${label}</div>
-        ${date ? `<div class="stage-date">${new Date(date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}</div>` : ''}
+        <div class="stage-label">${label}</div>
+        ${date ? `<div class="stage-date">${fmtDate(date)}</div>` : ''}
       </div>
     </div>`;
   }).join('');
-
-  let trackingHtml = '';
-  if (order.current_stage === 'shipped' && order.tracking) {
-    if (order.tracking.type === 'spx' && order.tracking.link) {
-      trackingHtml = `<div class="tracking-box">Your package is on its way. <a href="${order.tracking.link}" target="_blank" rel="noopener">Track your SPX package →</a></div>`;
-    } else if (order.tracking.type === 'jnt' && order.tracking.number) {
-      trackingHtml = `<div class="tracking-box">
-        Enter this tracking number at <a href="https://www.jtexpress.ph/track-and-trace" target="_blank" rel="noopener">jtexpress.ph/track-and-trace</a>:
-        <div class="tracking-num">${order.tracking.number}</div>
-      </div>`;
-    }
+}
+function buildTrackingHtml(order) {
+  if (order.current_stage !== 'shipped' || !order.tracking) return '';
+  if (order.tracking.type === 'spx' && order.tracking.link) {
+    return `<div class="tracking-box">Your package is on its way. <a href="${esc(order.tracking.link)}" target="_blank" rel="noopener">Track your SPX package &rarr;</a></div>`;
   }
+  if (order.tracking.type === 'jnt' && order.tracking.number) {
+    return `<div class="tracking-box">
+      Enter this tracking number at <a href="https://www.jtexpress.ph/track-and-trace" target="_blank" rel="noopener">jtexpress.ph/track-and-trace</a>:
+      <div class="tracking-num">${esc(order.tracking.number)}</div>
+    </div>`;
+  }
+  return '';
+}
 
-  return `<div class="order-card">
-    <div class="order-hdr">
-      <span class="order-id">Order #${order.id.slice(0, 8)}</span>
-      <span class="order-total">${P(order.total)}</span>
+function renderOrderDetail(order) {
+  const items = ACC.orderItemsByOrder[order.id] || [];
+  const currentIdx = STAGES.indexOf(order.current_stage);
+  const pct = Math.round((currentIdx / (STAGES.length - 1)) * 100);
+  const platformLabel = (CONTACT_PLATFORMS.find(p => p.key === order.contact_platform) || {}).label || order.contact_platform || '';
+  const payLabel = PAYMENT_LABELS[order.payment_method] || order.payment_method || '';
+  const payStatus = currentIdx >= 2 ? 'Payment confirmed' : 'Waiting for payment verification';
+
+  const itemRows = items.map(it => `<div class="detail-item">
+      ${thumbHtml(it, 'detail-thumb')}
+      <div class="detail-item-info">
+        <div class="detail-item-name">${esc(it.product_name)}</div>
+        ${it.variant ? `<div class="detail-item-var">${esc(it.variant)}</div>` : ''}
+        <div class="detail-item-var">${P(it.unit_price)} &times; ${it.qty}</div>
+      </div>
+      <div class="detail-item-price">${P(it.line_total)}</div>
+    </div>`).join('');
+
+  return `<button class="back-btn" onclick="closeOrderDetail()">&larr; All orders</button>
+
+    <div class="order-card">
+      <div class="order-hdr">
+        <span class="order-id">Order #${order.id.slice(0, 8)}</span>
+        <span class="order-id">Placed ${fmtDate(order.created_at)}</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+        <div class="progress-pct">${pct}%</div>
+      </div>
+      <div class="stage-list">${buildStageRows(order)}</div>
+      ${buildTrackingHtml(order)}
     </div>
-    <div class="order-items-mini">${itemsLine}</div>
-    <div class="progress-track">
-      <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
-      <div class="progress-pct">${pct}%</div>
+
+    <div class="card">
+      <h2>Items Ordered</h2>
+      ${itemRows || '<div class="empty-note">No items found.</div>'}
+      <div class="detail-line"><span>Subtotal</span><span>${P(order.subtotal)}</span></div>
+      <div class="detail-line"><span>Shipping fee</span><span>${P(order.shipping_fee)}</span></div>
+      <div class="detail-line total"><span>Total</span><span>${P(order.total)}</span></div>
     </div>
-    <div class="stage-list">${stageRows}</div>
-    ${trackingHtml}
-  </div>`;
+
+    <div class="card">
+      <h2>Delivery Information</h2>
+      <div class="detail-block"><div class="detail-k">Name</div><div>${esc(order.customer_name)}</div></div>
+      <div class="detail-block"><div class="detail-k">Address</div><div style="white-space:pre-line">${esc(order.address)}</div></div>
+      ${order.region_label ? `<div class="detail-block"><div class="detail-k">Shipping region</div><div>${esc(order.region_label)}</div></div>` : ''}
+      <div class="detail-block"><div class="detail-k">Contact number</div><div>${esc(order.contact_number)}</div></div>
+      <div class="detail-block"><div class="detail-k">Updates via</div><div>${esc(platformLabel)} ${esc(order.contact_handle || '')}</div></div>
+      ${order.notes ? `<div class="detail-block"><div class="detail-k">Your note</div><div style="white-space:pre-line">${esc(order.notes)}</div></div>` : ''}
+    </div>
+
+    <div class="card">
+      <h2>Payment</h2>
+      <div class="detail-block"><div class="detail-k">Method</div><div>${esc(payLabel)}</div></div>
+      <div class="detail-block"><div class="detail-k">Status</div><div>${payStatus}</div></div>
+      ${order.proof_url ? `<div class="detail-block"><a href="${esc(order.proof_url)}" target="_blank" rel="noopener" style="color:var(--lagoon);font-weight:600;font-size:13px">View your proof of payment &rarr;</a></div>` : ''}
+    </div>`;
 }
 
 /* ─── MESSAGE / CONTACT LINKS ─── */
