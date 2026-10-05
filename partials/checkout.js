@@ -1,355 +1,405 @@
 /* ============================================================
-   MEMBER DASHBOARD LOGIC
-   Depends on shared.js (SB_URL/SB_KEY on the page, loadSession,
-   openAuthModal/closeAuthModal/setAuthMode/submitAuth).
+   CHECKOUT PAGE LOGIC
+   Depends on: shipping-rates.js (SHIPPING_RATES, getShippingRate),
+   shared.js (SB_URL/SB_KEY already defined on the page, plus
+   loadSession/saveSession/openAuthModal/closeAuthModal/setAuthMode).
    ============================================================ */
 
 const $ = id => document.getElementById(id);
 
-const STAGES = ['order_placed', 'awaiting_payment_verification', 'payment_confirmed', 'preparing_order', 'shipped'];
-const STAGE_LABELS = {
-  order_placed: 'You placed an order',
-  awaiting_payment_verification: 'Waiting for payment verification',
-  payment_confirmed: 'Payment confirmed',
-  preparing_order: 'Preparing your order',
-  shipped: 'Order picked up by courier'
+const PAYMENT_QR = {
+  gcash:    { label: 'GCash',    img: 'https://static.wixstatic.com/media/d7782b_4f0c7227f5424c28b52a1b3e510258c6~mv2.png' },
+  bdo:      { label: 'BDO',      img: 'https://static.wixstatic.com/media/d7782b_711c8ee305b64c8da7db6d4c9d8c1557~mv2.png' },
+  gotyme:   { label: 'GoTyme',   img: 'https://static.wixstatic.com/media/d7782b_8c9282b35fb444328bb65bd83fc49439~mv2.png' },
+  maribank: { label: 'Maribank', img: 'https://static.wixstatic.com/media/d7782b_759677dabeb04f238fe987a1728b7153~mv2.png' },
+  cimb:     { label: 'CIMB Bank',img: 'https://static.wixstatic.com/media/d7782b_c0ffca6de8094dc59dd09ddd5bfb46f1~mv2.png' },
+  maya:     { label: 'Maya',     img: 'https://static.wixstatic.com/media/d7782b_bb7d3bebd7c54560b66636054b97d87c~mv2.png' }
 };
 
-const CONTACT_PLATFORMS = [
-  { key: 'instagram', label: 'Instagram', url: 'https://www.instagram.com/mikecharlieco/' },
-  { key: 'threads', label: 'Threads', url: 'https://www.threads.com/mikecharlieco/' },
-  { key: 'whatsapp', label: 'WhatsApp', url: 'https://wa.me/message/T7LXVS3L74A5C1' },
-  { key: 'viber', label: 'Viber', url: 'viber://add?number=639760467782' },
-  { key: 'imessage', label: 'iMessage', url: 'sms:+639760467782' },
-  { key: 'messenger', label: 'Messenger', url: 'https://m.me/mikecharlieco' }
-];
-
+// Platforms that use a phone number vs. a text handle
 const PHONE_PLATFORMS = ['imessage', 'whatsapp', 'viber'];
+const HANDLE_PLATFORMS = ['threads', 'instagram'];
 
-let ACC = { session: null, profile: null, likes: [], orders: [], orderItemsByOrder: {} };
+const GUEST_DETAILS_KEY = 'mcc_checkout_details';
 
-async function initAccount() {
-  ACC.session = (typeof getFreshSession === 'function') ? await getFreshSession() : null;
-  if (!ACC.session) {
-    $('gate').style.display = 'block';
-    $('dashboard').style.display = 'none';
+const CO = {
+  cart: JSON.parse(localStorage.getItem('mcc_cart') || '[]'),
+  skus: [],
+  session: null,       // logged-in session, if any
+  profile: null,       // row from mcc_customers, if logged in
+  subtotal: 0,
+  shippingFee: null,
+  proofUrl: null
+};
+
+async function sbGet(table, query) {
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?${query}`, { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } });
+  if (!r.ok) throw new Error('Load failed: ' + table);
+  return r.json();
+}
+
+/* ─── INIT ─── */
+async function initCheckout() {
+  if (!CO.cart.length) {
+    $('co-items').innerHTML = '<p style="font-size:13px;color:var(--text-muted)">Your tote bag is empty. <a href="/" style="color:var(--lagoon);font-weight:600">Go back to shop</a></p>';
+    $('submit-btn').disabled = true;
+  }
+
+  populateRegionDropdown();
+
+  // Load cart product details
+  if (CO.cart.length) {
+    try {
+      const ids = CO.cart.map(i => i.sku_id).join(',');
+      const [skus, listings, variantPhotos] = await Promise.all([
+        sbGet('skus', `id=in.(${ids})&select=*`),
+        sbGet('product_listings', 'select=*'),
+        sbGet('variant_photos', `sku_id=in.(${ids})&select=sku_id,photo_url`)
+      ]);
+      const listingByTitle = {}; listings.forEach(l => listingByTitle[l.title] = l);
+      const photoBySku = {}; variantPhotos.forEach(p => { if (p.photo_url) photoBySku[p.sku_id] = p.photo_url; });
+      skus.forEach(s => { s.listing = listingByTitle[s.product_name] || {}; s.coverPhoto = photoBySku[s.id] || s.listing.cover_image_url || null; });
+      CO.skus = skus;
+      renderItems();
+    } catch (e) {
+      $('co-items').innerHTML = '<p style="font-size:13px;color:var(--danger)">Could not load your items. Please refresh.</p>';
+    }
+  }
+
+  // Session check — logged in vs guest
+  // getFreshSession quietly renews the hour-long login pass, so a customer
+  // who is still "logged in" in the header is also logged in here.
+  CO.session = (typeof getFreshSession === 'function') ? await getFreshSession() : ((typeof loadSession === 'function') ? loadSession() : null);
+  if (CO.session && CO.session.access_token) {
+    await loadCustomerProfile();
+  } else {
+    CO.session = null;
+    prefillFromGuestStorage();
+  }
+  renderAcctBanner();
+  recalcTotals();
+}
+
+function renderItems() {
+  let subtotal = 0;
+  $('co-items').innerHTML = CO.cart.map(item => {
+    const sku = CO.skus.find(s => s.id === item.sku_id);
+    if (!sku) return '';
+    const price = (sku.is_on_sale && sku.sale_price != null) ? sku.sale_price : sku.retail_price_direct;
+    const lineTotal = (price || 0) * item.qty;
+    subtotal += lineTotal;
+    return `<div class="co-item">
+      <div class="co-item-img">${sku.coverPhoto ? `<img src="${sku.coverPhoto}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">` : '🌿'}</div>
+      <div class="co-item-info">
+        <div class="co-item-name">${sku.product_name}</div>
+        ${sku.variant ? `<div class="co-item-var">${sku.variant}</div>` : ''}
+        <div class="co-item-qty">Qty: ${item.qty}</div>
+      </div>
+      <div class="co-item-price">${P(lineTotal)}</div>
+    </div>`;
+  }).join('');
+  CO.subtotal = subtotal;
+}
+
+function totalWeightKg() {
+  let grams = 0;
+  CO.cart.forEach(item => {
+    const sku = CO.skus.find(s => s.id === item.sku_id);
+    // Assumes a weight_g column on skus (grams per unit). Falls back to 0
+    // if that column doesn't exist yet — flag this to Lois if totals look off.
+    const w = sku && sku.weight_g != null ? Number(sku.weight_g) : 0;
+    grams += w * item.qty;
+  });
+  return grams / 1000;
+}
+
+function populateRegionDropdown() {
+  const sel = $('f-region');
+  SHIPPING_RATES.forEach(r => {
+    const opt = document.createElement('option');
+    opt.value = r.id; opt.textContent = r.label;
+    sel.appendChild(opt);
+  });
+}
+
+function recalcTotals() {
+  $('bd-subtotal').textContent = P(CO.subtotal);
+  const regionId = $('f-region').value;
+  if (!regionId) { $('bd-shipping').textContent = '—'; $('bd-total').textContent = P(CO.subtotal); CO.shippingFee = null; return; }
+  const fee = getShippingRate(regionId, totalWeightKg());
+  if (fee == null) {
+    $('bd-shipping').textContent = 'Contact us';
+    $('bd-total').textContent = P(CO.subtotal);
+    CO.shippingFee = null;
     return;
   }
-  $('gate').style.display = 'none';
-  $('dashboard').style.display = 'block';
-  if (typeof renderHeaderAuth === 'function') renderHeaderAuth();
-
-  renderPlatformLinks();
-  await Promise.all([loadProfile(), loadLikes(), loadOrders()]);
-
-  // Links like /account.html#orders open straight on that tab
-  const wanted = window.location.hash.replace('#', '');
-  if (wanted && document.getElementById('panel-' + wanted)) switchTab(wanted);
+  CO.shippingFee = fee;
+  $('bd-shipping').textContent = P(fee);
+  $('bd-total').textContent = P(CO.subtotal + fee);
 }
 
-// Contact number: digits only, 11 max
-(function limitProfileContact() {
-  const el = document.getElementById('p-contact');
-  if (!el) return;
-  el.maxLength = 11;
-  el.setAttribute('inputmode', 'numeric');
-  el.placeholder = '09XXXXXXXXX';
-  el.addEventListener('input', () => { el.value = el.value.replace(/\D/g, '').slice(0, 11); });
-})();
-
-function sbHeaders() {
-  return { apikey: SB_KEY, Authorization: 'Bearer ' + ACC.session.access_token, 'Content-Type': 'application/json' };
-}
-
-/* ─── TABS ─── */
-function switchTab(name) {
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('on', p.id === 'panel-' + name));
-}
-
-/* ─── PROFILE ─── */
-async function loadProfile() {
-  const rows = await fetch(`${SB_URL}/rest/v1/mcc_customers?id=eq.${ACC.session.user.id}&select=*`, { headers: sbHeaders() }).then(r => r.json());
-  ACC.profile = rows[0] || null;
-  if (ACC.profile) {
-    $('p-name').value = ACC.profile.full_name || '';
-    $('p-address').value = ACC.profile.address || '';
-    $('p-contact').value = (ACC.profile.contact_number || '').replace(/\D/g, '').slice(0, 11);
-    if (ACC.profile.contact_platform) {
-      $('p-platform').value = ACC.profile.contact_platform;
-      onProfilePlatformChange();
-      $('p-handle').value = (ACC.profile.contact_handle || '').replace(/^(\+639|@)/, '');
-    }
-  } else {
-    // Brand new member (for example, signed up with Google): pre-fill their name
-    const meta = (ACC.session.user && ACC.session.user.user_metadata) || {};
-    if (meta.full_name) $('p-name').value = meta.full_name;
-  }
-}
-
-function onProfilePlatformChange() {
-  const platform = $('p-platform').value;
-  const wrap = $('p-handle-wrap');
-  const prefixEl = $('p-handle-prefix');
-  const input = $('p-handle');
+/* ─── PLATFORM / HANDLE LOGIC ─── */
+function onPlatformChange() {
+  const platform = $('f-platform').value;
+  const wrap = $('handle-field-wrap');
+  const prefixEl = $('handle-prefix');
+  const input = $('f-handle');
+  input.value = '';
   if (!platform) { wrap.style.display = 'none'; return; }
   wrap.style.display = 'block';
   if (PHONE_PLATFORMS.includes(platform)) {
-    $('p-handle-label').innerHTML = 'Phone number for updates <span class="req">*</span>';
+    $('handle-label').textContent = 'Phone number for updates';
     prefixEl.textContent = '+639';
-    input.maxLength = 9;
-    input.setAttribute('inputmode', 'numeric');
-    input.oninput = () => { input.value = input.value.replace(/\D/g, '').slice(0, 9); };
+    input.placeholder = '17 123 4567';
+    input.oninput = () => { input.value = input.value.replace(/\D/g, ''); };
   } else {
-    $('p-handle-label').innerHTML = 'Handle <span class="req">*</span>';
+    $('handle-label').textContent = 'Handle';
     prefixEl.textContent = '@';
-    input.removeAttribute('maxlength');
-    input.removeAttribute('inputmode');
+    input.placeholder = 'yourhandle';
+    // Letters, numbers, periods, underscores — matches real IG/Threads handle rules
     input.oninput = () => { input.value = input.value.replace(/[^a-zA-Z0-9._]/g, ''); };
   }
 }
 
-async function saveProfile() {
-  const msg = $('save-msg');
-  const showMsg = (text, ok) => {
-    msg.textContent = text;
-    msg.style.color = ok ? 'var(--success)' : 'var(--danger)';
-    msg.style.display = 'inline';
-    clearTimeout(msg._t);
-    msg._t = setTimeout(() => msg.style.display = 'none', ok ? 2500 : 5000);
-  };
+function getFullHandle() {
+  const platform = $('f-platform').value;
+  const raw = $('f-handle').value.trim();
+  if (!platform || !raw) return '';
+  return PHONE_PLATFORMS.includes(platform) ? ('+639' + raw) : ('@' + raw);
+}
 
-  const name = $('p-name').value.trim();
-  const address = $('p-address').value.trim();
-  const contact = $('p-contact').value.trim();
-  const platform = $('p-platform').value;
-  const rawHandle = $('p-handle').value.trim();
+/* ─── PAYMENT ─── */
+function onPaymentChange() {
+  const method = $('f-payment').value;
+  const box = $('qr-box');
+  if (!method || !PAYMENT_QR[method]) { box.classList.remove('show'); return; }
+  $('qr-img').src = PAYMENT_QR[method].img;
+  $('qr-img').alt = PAYMENT_QR[method].label + ' QR code';
+  box.classList.add('show');
+}
 
-  if (!name || !address || !contact || !platform || !rawHandle) return showMsg('Please fill out all fields marked with *.', false);
-  if (!/^\d{11}$/.test(contact)) return showMsg('Contact number must be exactly 11 digits.', false);
-  if (PHONE_PLATFORMS.includes(platform) && !/^\d{9}$/.test(rawHandle)) return showMsg('Enter the 9 digits that come after +639.', false);
+let proofFile = null;
+function onProofSelected() {
+  const input = $('f-proof');
+  proofFile = input.files[0] || null;
+  const box = $('upload-box');
+  if (proofFile) { box.classList.add('has-file'); $('upload-label').textContent = '✓ ' + proofFile.name; }
+  else { box.classList.remove('has-file'); $('upload-label').textContent = 'Tap to upload a screenshot or photo of your payment'; }
+}
 
-  const handle = PHONE_PLATFORMS.includes(platform) ? '+639' + rawHandle : '@' + rawHandle;
-  const payload = {
-    id: ACC.session.user.id,
-    full_name: name,
-    address: address,
-    contact_number: contact,
-    contact_platform: platform,
-    contact_handle: handle
-  };
+async function uploadProof() {
+  const path = `proof/${Date.now()}_${proofFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+  const r = await fetch(`${SB_URL}/storage/v1/object/proof-of-payment/${path}`, {
+    method: 'POST',
+    headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': proofFile.type },
+    body: proofFile
+  });
+  if (!r.ok) throw new Error('Proof upload failed. Please try again.');
+  return `${SB_URL}/storage/v1/object/public/proof-of-payment/${path}`;
+}
+
+/* ─── GUEST DETAIL PERSISTENCE ─── */
+function prefillFromGuestStorage() {
   try {
-    const r = await fetch(`${SB_URL}/rest/v1/mcc_customers`, {
+    const saved = JSON.parse(localStorage.getItem(GUEST_DETAILS_KEY) || 'null');
+    if (!saved) return;
+    $('f-name').value = saved.full_name || '';
+    $('f-address').value = saved.address || '';
+    $('f-contact').value = saved.contact_number || '';
+    if (saved.platform) { $('f-platform').value = saved.platform; onPlatformChange(); $('f-handle').value = (saved.handle || '').replace(/^(\+639|@)/, ''); }
+    if (saved.region_id) $('f-region').value = saved.region_id;
+  } catch (e) {}
+}
+function saveGuestDetails() {
+  localStorage.setItem(GUEST_DETAILS_KEY, JSON.stringify({
+    full_name: $('f-name').value.trim(),
+    address: $('f-address').value.trim(),
+    contact_number: $('f-contact').value.trim(),
+    platform: $('f-platform').value,
+    handle: getFullHandle(),
+    region_id: $('f-region').value
+  }));
+}
+
+/* ─── LOGGED-IN CUSTOMER PROFILE ─── */
+async function loadCustomerProfile() {
+  try {
+    const rows = await fetch(`${SB_URL}/rest/v1/mcc_customers?id=eq.${CO.session.user.id}&select=*`, {
+      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + CO.session.access_token }
+    }).then(r => r.json());
+    CO.profile = rows[0] || null;
+    if (CO.profile) {
+      $('f-name').value = CO.profile.full_name || '';
+      $('f-address').value = CO.profile.address || '';
+      $('f-contact').value = CO.profile.contact_number || '';
+      if (CO.profile.contact_platform) {
+        $('f-platform').value = CO.profile.contact_platform;
+        onPlatformChange();
+        $('f-handle').value = (CO.profile.contact_handle || '').replace(/^(\+639|@)/, '');
+      }
+    }
+  } catch (e) { /* not fatal — form just starts blank */ }
+}
+
+function renderAcctBanner() {
+  // The create-account-vs-guest choice already happened in the cart, so
+  // this only needs to confirm the outcome — no prompt to repeat here.
+  const el = $('acct-banner');
+  if (CO.session) {
+    el.className = 'acct-banner signed-in';
+    el.innerHTML = `<p>Signed in as <strong>${CO.session.user.email}</strong> — this order will be saved to your account.</p>`;
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+/* ─── VALIDATION ─── */
+function validateForm() {
+  const name = $('f-name').value.trim();
+  const address = $('f-address').value.trim();
+  const contact = $('f-contact').value.trim();
+  const platform = $('f-platform').value;
+  const handle = $('f-handle').value.trim();
+  const region = $('f-region').value;
+  const payment = $('f-payment').value;
+
+  if (!CO.cart.length) return 'Your tote bag is empty.';
+  if (!name || !address || !contact || !platform || !handle || !region) return 'Please fill out all fields in Your Details.';
+  if (!payment) return 'Please select a mode of payment.';
+  if (!proofFile) return 'Please upload proof of payment.';
+  if (CO.shippingFee == null) return 'We couldn\'t calculate shipping for that region/weight — please contact us directly for a manual quote.';
+  return null;
+}
+
+/* ─── SUBMIT ─── */
+async function submitOrder() {
+  // Re-check login status right before submitting — catches a customer
+  // who logs in via the header link mid-form, after the page first loaded.
+  const freshSession = (typeof getFreshSession === 'function') ? await getFreshSession() : ((typeof loadSession === 'function') ? loadSession() : null);
+  CO.session = (freshSession && freshSession.access_token) ? freshSession : null;
+
+  const err = validateForm();
+  const errBox = $('form-err');
+  if (err) { errBox.textContent = err; errBox.style.display = 'block'; window.scrollTo(0, 0); return; }
+  errBox.style.display = 'none';
+
+  const btn = $('submit-btn'); const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Submitting...';
+
+  try {
+    CO.proofUrl = await uploadProof();
+
+    const orderPayload = {
+      customer_id: CO.session ? CO.session.user.id : null,
+      customer_name: $('f-name').value.trim(),
+      address: $('f-address').value.trim(),
+      contact_number: $('f-contact').value.trim(),
+      contact_platform: $('f-platform').value,
+      contact_handle: getFullHandle(),
+      region_id: $('f-region').value,
+      region_label: SHIPPING_RATES.find(r => r.id === $('f-region').value)?.label || '',
+      total_weight_kg: totalWeightKg(),
+      subtotal: CO.subtotal,
+      shipping_fee: CO.shippingFee,
+      total: CO.subtotal + CO.shippingFee,
+      payment_method: $('f-payment').value,
+      proof_url: CO.proofUrl,
+      notes: $('f-note').value.trim() || null
+    };
+
+    const orderRes = await fetch(`${SB_URL}/rest/v1/mcc_orders`, {
       method: 'POST',
-      headers: { ...sbHeaders(), Prefer: 'resolution=merge-duplicates' },
-      body: JSON.stringify(payload)
+      headers: {
+        apikey: SB_KEY,
+        Authorization: 'Bearer ' + (CO.session ? CO.session.access_token : SB_KEY),
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation'
+      },
+      body: JSON.stringify(orderPayload)
     });
-    if (r.ok) {
-      localStorage.setItem('mcc_display_name', name);
-      if (typeof renderHeaderAuth === 'function') renderHeaderAuth();
-      showMsg('Saved \u2713', true);
-    } else showMsg('Could not save. Please try again.', false);
-  } catch (e) { showMsg('Could not save. Please check your connection.', false); }
-}
+    if (!orderRes.ok) throw new Error('Could not submit your order. Please try again.');
+    const [order] = await orderRes.json();
 
-/* ─── LIKES ─── */
-async function loadLikes() {
-  const likeRows = await fetch(`${SB_URL}/rest/v1/mcc_likes?customer_id=eq.${ACC.session.user.id}&select=sku_id`, { headers: sbHeaders() }).then(r => r.json());
-  if (!likeRows.length) { $('likes-grid').innerHTML = '<div class="empty-note">Nothing hearted yet — browse the shop and tap the heart on anything you love.</div>'; return; }
-  const ids = likeRows.map(l => l.sku_id).join(',');
-  const skus = await fetch(`${SB_URL}/rest/v1/skus?id=in.(${ids})&select=*`, { headers: sbHeaders() }).then(r => r.json());
-  const listings = await fetch(`${SB_URL}/rest/v1/product_listings?select=*`, { headers: sbHeaders() }).then(r => r.json());
-  const listingByTitle = {}; listings.forEach(l => listingByTitle[l.title] = l);
+    const items = CO.cart.map(item => {
+      const sku = CO.skus.find(s => s.id === item.sku_id);
+      const price = (sku.is_on_sale && sku.sale_price != null) ? sku.sale_price : sku.retail_price_direct;
+      return {
+        order_id: order.id,
+        sku_id: sku.id,
+        product_name: sku.product_name,
+        variant: sku.variant || null,
+        cover_image_url: sku.coverPhoto || null,
+        unit_price: price,
+        qty: item.qty,
+        line_total: price * item.qty
+      };
+    });
+    const itemsRes = await fetch(`${SB_URL}/rest/v1/mcc_order_items`, {
+      method: 'POST',
+      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + (CO.session ? CO.session.access_token : SB_KEY), 'Content-Type': 'application/json' },
+      body: JSON.stringify(items)
+    });
+    if (!itemsRes.ok) throw new Error('Order saved, but there was an issue recording your items — please contact us with your order confirmation.');
 
-  $('likes-grid').innerHTML = skus.map(sku => {
-    const price = (sku.is_on_sale && sku.sale_price != null) ? sku.sale_price : sku.retail_price_direct;
-    const img = sku.listing_cover || (listingByTitle[sku.product_name] || {}).cover_image_url;
-    return `<div class="like-card">
-      <button class="unheart-btn" onclick="unheart('${sku.id}')" title="Remove">♥</button>
-      ${img ? `<img class="like-img" src="${img}">` : `<div class="like-img"></div>`}
-      <div class="like-info">
-        <div class="like-name">${sku.product_name}</div>
-        <div class="like-price">${P(price)}</div>
-      </div>
-    </div>`;
-  }).join('');
-}
+    // Persist details for next time
+    if (CO.session) {
+      await fetch(`${SB_URL}/rest/v1/mcc_customers?id=eq.${CO.session.user.id}`, {
+        method: 'PATCH',
+        headers: { apikey: SB_KEY, Authorization: 'Bearer ' + CO.session.access_token, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
+        body: JSON.stringify({
+          full_name: orderPayload.customer_name, address: orderPayload.address,
+          contact_number: orderPayload.contact_number, contact_platform: orderPayload.contact_platform,
+          contact_handle: orderPayload.contact_handle
+        })
+      });
+    } else {
+      saveGuestDetails();
+      sessionStorage.setItem('mcc_signup_prefill', JSON.stringify(orderPayload));
+    }
 
-async function unheart(skuId) {
-  await fetch(`${SB_URL}/rest/v1/mcc_likes?customer_id=eq.${ACC.session.user.id}&sku_id=eq.${skuId}`, { method: 'DELETE', headers: sbHeaders() });
-  loadLikes();
-}
-
-/* ─── ORDERS ─── */
-async function loadOrders() {
-  const orders = await fetch(`${SB_URL}/rest/v1/mcc_orders?customer_id=eq.${ACC.session.user.id}&select=*&order=created_at.desc`, { headers: sbHeaders() }).then(r => r.json());
-  ACC.orders = orders;
-  if (!orders.length) { $('orders-list').innerHTML = '<div class="empty-note">No orders yet.</div>'; return; }
-  const orderIds = orders.map(o => o.id).join(',');
-  const items = await fetch(`${SB_URL}/rest/v1/mcc_order_items?order_id=in.(${orderIds})&select=*`, { headers: sbHeaders() }).then(r => r.json());
-  ACC.orderItemsByOrder = {};
-  items.forEach(it => { (ACC.orderItemsByOrder[it.order_id] ||= []).push(it); });
-  switchOrderTab('current');
-}
-
-function switchOrderTab(which) {
-  ACC.orderTab = which;
-  const tabs = document.querySelector('.order-tabs');
-  if (tabs) tabs.style.display = 'flex';
-  document.querySelectorAll('.order-tab').forEach(b => b.classList.toggle('on', b.dataset.ot === which));
-  const filtered = ACC.orders.filter(o => which === 'current' ? o.current_stage !== 'shipped' : o.current_stage === 'shipped');
-  if (!filtered.length) {
-    $('orders-list').innerHTML = `<div class="empty-note">No ${which} orders.</div>`;
-    return;
+    localStorage.setItem('mcc_cart', '[]');
+    showConfirmation();
+  } catch (e) {
+    errBox.textContent = e.message; errBox.style.display = 'block'; window.scrollTo(0, 0);
+  } finally {
+    btn.disabled = false; btn.textContent = orig;
   }
-  $('orders-list').innerHTML = filtered.map(renderOrderSummary).join('');
 }
 
-/* ─── small helpers for the order screens ─── */
-const PAYMENT_LABELS = { gcash: 'GCash', bdo: 'BDO', gotyme: 'GoTyme', maribank: 'Maribank', cimb: 'CIMB Bank', maya: 'Maya' };
-const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const fmtDate = d => d ? new Date(d).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
-
-function currentStatusLabel(order) {
-  if (order.current_stage === 'shipped' && order.courier) return `Order picked up by ${order.courier === 'spx' ? 'SPX' : 'J&T'}`;
-  return STAGE_LABELS[order.current_stage] || 'Order placed';
-}
-function thumbHtml(item, cls) {
-  // Small picture of the product. If the picture is missing or fails to load, an empty soft box shows instead.
-  if (!item.cover_image_url) return `<div class="${cls}"></div>`;
-  return `<img class="${cls}" src="${esc(item.cover_image_url)}" alt="" loading="lazy" decoding="async" onerror="this.style.visibility='hidden'">`;
+function showConfirmation() {
+  $('checkout-view').style.display = 'none';
+  $('acct-banner').style.display = 'none';
+  $('confirm-view').style.display = 'block';
+  if (!CO.session) $('signup-prompt').style.display = 'block';
 }
 
-/* ─── ORDER LIST CARD (short version, tap to open) ─── */
-function renderOrderSummary(order) {
-  const items = ACC.orderItemsByOrder[order.id] || [];
-  const thumbs = items.slice(0, 4).map(it => thumbHtml(it, 'thumb')).join('');
-  const more = items.length > 4 ? `<span class="thumb-more">+${items.length - 4}</span>` : '';
-  const count = items.reduce((s, i) => s + (i.qty || 0), 0);
-  const idx = STAGES.indexOf(order.current_stage);
-  const pill = idx >= 4 ? 'pill-ship' : idx >= 2 ? 'pill-ok' : 'pill-wait';
-  return `<div class="order-card clickable" onclick="openOrderDetail('${order.id}')">
-    <div class="order-hdr">
-      <span class="order-id">Order #${order.id.slice(0, 8)} &middot; ${fmtDate(order.created_at)}</span>
-      <span class="status-pill ${pill}">${esc(currentStatusLabel(order))}</span>
-    </div>
-    <div class="order-thumbs">${thumbs}${more}</div>
-    <div class="order-sum-row">
-      <span class="order-items-mini">${count} item${count === 1 ? '' : 's'}</span>
-      <span class="order-total">${P(order.total)}</span>
-    </div>
-    <div class="view-link">View order details &rsaquo;</div>
-  </div>`;
+function openSignupFromConfirm() {
+  openAuthModal();
+  setAuthMode('signup');
 }
 
-/* ─── ORDER DETAIL PAGE ─── */
-function openOrderDetail(orderId) {
-  const order = ACC.orders.find(o => o.id === orderId);
-  if (!order) return;
-  const tabs = document.querySelector('.order-tabs');
-  if (tabs) tabs.style.display = 'none';
-  $('orders-list').innerHTML = renderOrderDetail(order);
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-function closeOrderDetail() {
-  switchOrderTab(ACC.orderTab || 'current');
-}
-
-function buildStageRows(order) {
-  const currentIdx = STAGES.indexOf(order.current_stage);
-  // Customers only see steps that have happened so far. Future steps stay hidden.
-  return STAGES.map((key, i) => {
-    if (i > currentIdx) return '';
-    const date = order.stage_dates && order.stage_dates[key];
-    let label = STAGE_LABELS[key];
-    if (key === 'shipped' && order.courier) label = `Order picked up by ${order.courier === 'spx' ? 'SPX' : 'J&T'}`;
-    return `<div class="stage-row">
-      <div class="stage-dot done">&#10003;</div>
-      <div class="stage-text">
-        <div class="stage-label">${label}</div>
-        ${date ? `<div class="stage-date">${fmtDate(date)}</div>` : ''}
-      </div>
-    </div>`;
-  }).join('');
-}
-function buildTrackingHtml(order) {
-  if (order.current_stage !== 'shipped' || !order.tracking) return '';
-  if (order.tracking.type === 'spx' && order.tracking.link) {
-    return `<div class="tracking-box">Your package is on its way. <a href="${esc(order.tracking.link)}" target="_blank" rel="noopener">Track your SPX package &rarr;</a></div>`;
+/* After a successful sign-up on this page, use the just-placed guest
+   order's details to pre-fill the new customer profile (does NOT
+   retroactively attach that guest order to the new account — see notes). */
+const _originalSubmitAuth = window.submitAuth;
+window.submitAuth = async function () {
+  const wasSignup = (typeof authMode !== 'undefined' && authMode === 'signup');
+  await _originalSubmitAuth();
+  const session = (typeof loadSession === 'function') ? loadSession() : null;
+  if (wasSignup && session) {
+    const prefill = JSON.parse(sessionStorage.getItem('mcc_signup_prefill') || 'null');
+    if (prefill) {
+      await fetch(`${SB_URL}/rest/v1/mcc_customers`, {
+        method: 'POST',
+        headers: { apikey: SB_KEY, Authorization: 'Bearer ' + session.access_token, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
+        body: JSON.stringify({
+          id: session.user.id, full_name: prefill.customer_name, address: prefill.address,
+          contact_number: prefill.contact_number, contact_platform: prefill.contact_platform,
+          contact_handle: prefill.contact_handle
+        })
+      });
+    }
   }
-  if (order.tracking.type === 'jnt' && order.tracking.number) {
-    return `<div class="tracking-box">
-      Enter this tracking number at <a href="https://www.jtexpress.ph/track-and-trace" target="_blank" rel="noopener">jtexpress.ph/track-and-trace</a>:
-      <div class="tracking-num">${esc(order.tracking.number)}</div>
-    </div>`;
-  }
-  return '';
-}
+};
 
-function renderOrderDetail(order) {
-  const items = ACC.orderItemsByOrder[order.id] || [];
-  const currentIdx = STAGES.indexOf(order.current_stage);
-  const pct = Math.round((currentIdx / (STAGES.length - 1)) * 100);
-  const platformLabel = (CONTACT_PLATFORMS.find(p => p.key === order.contact_platform) || {}).label || order.contact_platform || '';
-  const payLabel = PAYMENT_LABELS[order.payment_method] || order.payment_method || '';
-  const payStatus = currentIdx >= 2 ? 'Payment confirmed' : 'Waiting for payment verification';
-
-  const itemRows = items.map(it => `<div class="detail-item">
-      ${thumbHtml(it, 'detail-thumb')}
-      <div class="detail-item-info">
-        <div class="detail-item-name">${esc(it.product_name)}</div>
-        ${it.variant ? `<div class="detail-item-var">${esc(it.variant)}</div>` : ''}
-        <div class="detail-item-var">${P(it.unit_price)} &times; ${it.qty}</div>
-      </div>
-      <div class="detail-item-price">${P(it.line_total)}</div>
-    </div>`).join('');
-
-  return `<button class="back-btn" onclick="closeOrderDetail()">&larr; All orders</button>
-
-    <div class="order-card">
-      <div class="order-hdr">
-        <span class="order-id">Order #${order.id.slice(0, 8)}</span>
-        <span class="order-id">Placed ${fmtDate(order.created_at)}</span>
-      </div>
-      <div class="progress-track">
-        <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
-        <div class="progress-pct">${pct}%</div>
-      </div>
-      <div class="stage-list">${buildStageRows(order)}</div>
-      ${buildTrackingHtml(order)}
-    </div>
-
-    <div class="card">
-      <h2>Items Ordered</h2>
-      ${itemRows || '<div class="empty-note">No items found.</div>'}
-      <div class="detail-line"><span>Subtotal</span><span>${P(order.subtotal)}</span></div>
-      <div class="detail-line"><span>Shipping fee</span><span>${P(order.shipping_fee)}</span></div>
-      <div class="detail-line total"><span>Total</span><span>${P(order.total)}</span></div>
-    </div>
-
-    <div class="card">
-      <h2>Delivery Information</h2>
-      <div class="detail-block"><div class="detail-k">Name</div><div>${esc(order.customer_name)}</div></div>
-      <div class="detail-block"><div class="detail-k">Address</div><div style="white-space:pre-line">${esc(order.address)}</div></div>
-      ${order.region_label ? `<div class="detail-block"><div class="detail-k">Shipping region</div><div>${esc(order.region_label)}</div></div>` : ''}
-      <div class="detail-block"><div class="detail-k">Contact number</div><div>${esc(order.contact_number)}</div></div>
-      <div class="detail-block"><div class="detail-k">Updates via</div><div>${esc(platformLabel)} ${esc(order.contact_handle || '')}</div></div>
-      ${order.notes ? `<div class="detail-block"><div class="detail-k">Your note</div><div style="white-space:pre-line">${esc(order.notes)}</div></div>` : ''}
-    </div>
-
-    <div class="card">
-      <h2>Payment</h2>
-      <div class="detail-block"><div class="detail-k">Method</div><div>${esc(payLabel)}</div></div>
-      <div class="detail-block"><div class="detail-k">Status</div><div>${payStatus}</div></div>
-      ${order.proof_url ? `<div class="detail-block"><a href="${esc(order.proof_url)}" target="_blank" rel="noopener" style="color:var(--lagoon);font-weight:600;font-size:13px">View your proof of payment &rarr;</a></div>` : ''}
-    </div>`;
-}
-
-/* ─── MESSAGE / CONTACT LINKS ─── */
-function renderPlatformLinks() {
-  $('platform-links').innerHTML = CONTACT_PLATFORMS.map(p =>
-    `<a class="platform-link" href="${p.url}" target="_blank" rel="noopener"><span>${p.label}</span><span class="arrow">→</span></a>`
-  ).join('');
-}
-
-initAccount();
+initCheckout();
