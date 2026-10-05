@@ -1,6 +1,6 @@
 /* ─────────────────────────────────────────────────────────
    INVENTORY TAB
-   renderInventory(), filteredSkus(), the table, New Product modal, Adjustment modal, Manual Cut modal.
+   renderInventory(), filteredSkus(), the read-only table, Adjustment modal. Adding/editing products now happens only in the Products tab.
    ───────────────────────────────────────────────────────── */
 
 /* ─── INVENTORY TAB ─── */
@@ -47,7 +47,6 @@ function renderInventory(){
       </label>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-p btn-sm" onclick="openNewProductModal()">+ New Product</button>
       <button class="btn btn-o btn-sm" onclick="openAdjustmentModal()">📋 Other Adjustment</button>
     </div>
   </div>`;
@@ -56,7 +55,7 @@ function renderInventory(){
     html+=`<div class="empty"><div class="empty-i">📦</div><p>No products match.</p></div>`;
   }else{
     html+=`<div class="table-wrap"><table><thead><tr>
-      <th class="frz c1">Product Name</th><th class="frz c2">Stock</th><th class="frz c3">Actions</th>
+      <th class="frz c1">Product Name</th><th class="frz c2" style="box-shadow:2px 0 6px rgba(0,0,0,.05)">Stock</th>
       <th>SKU</th><th>Category</th><th>Location</th><th>Unit Cost</th><th>Price (Direct)</th><th>Price (Shopee)</th>
       <th>Sellable</th><th>Supplier</th><th>Notes</th>
     </tr></thead><tbody>`;
@@ -64,12 +63,7 @@ function renderInventory(){
       const low=s.current_stock<=s.low_stock_threshold;
       html+=`<tr>
         <td class="frz c1"><strong>${s.product_name}</strong>${s.variant?`<br><span class="t-muted" style="font-size:11px">${s.variant}</span>`:''}</td>
-        <td class="frz c2 ${low?'stock-low':'stock-ok'}">${s.current_stock}${low?' ⚠':''}</td>
-        <td class="frz c3"><div class="act-btns">
-          <button class="btn btn-p btn-sm" onclick="openNewProductModal('${s.id}')">✎ Edit</button>
-          <button class="btn btn-o btn-sm" onclick="openAdjustmentModal('${s.id}')">±</button>
-          <button class="btn btn-t btn-sm" onclick="openCutModal('${s.id}')">✂ Cut</button>
-        </div></td>
+        <td class="frz c2 ${low?'stock-low':'stock-ok'}" style="box-shadow:2px 0 6px rgba(0,0,0,.05)">${s.current_stock}${low?' ⚠':''}</td>
         <td>${s.sku_code}</td>
         <td>${s.categories?s.categories.name:'<span class="t-muted">Unassigned</span>'}</td>
         <td><span class="pill-tiny ${s.location==='studio'?'pill-studio':'pill-warehouse'}">${s.location}</span></td>
