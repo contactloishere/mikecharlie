@@ -239,6 +239,17 @@ async function loadCustomerProfile() {
       }
     }
   } catch (e) { /* not fatal — form just starts blank */ }
+
+  // Region is not stored on the profile, so borrow it from the customer's
+  // most recent order (same account, so it is their own saved choice).
+  try {
+    if (!$('f-region').value) {
+      const last = await fetch(`${SB_URL}/rest/v1/mcc_orders?customer_id=eq.${CO.session.user.id}&select=region_id&order=created_at.desc&limit=1`, {
+        headers: { apikey: SB_KEY, Authorization: 'Bearer ' + CO.session.access_token }
+      }).then(r => r.json());
+      if (Array.isArray(last) && last[0] && last[0].region_id) $('f-region').value = last[0].region_id;
+    }
+  } catch (e) { /* optional nicety only */ }
 }
 
 function renderAcctBanner() {
@@ -285,6 +296,7 @@ async function submitOrder() {
 
   const btn = $('submit-btn'); const orig = btn.textContent;
   btn.disabled = true; btn.textContent = 'Submitting...';
+  showProcessing(true);
 
   try {
     CO.proofUrl = await uploadProof();
@@ -362,8 +374,26 @@ async function submitOrder() {
   } catch (e) {
     errBox.textContent = e.message; errBox.style.display = 'block'; window.scrollTo(0, 0);
   } finally {
+    showProcessing(false);
     btn.disabled = false; btn.textContent = orig;
   }
+}
+
+/* Full-screen "please wait" message while the order is being sent */
+function showProcessing(on) {
+  let el = document.getElementById('mcc-processing');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'mcc-processing';
+    el.style.cssText = 'position:fixed;inset:0;background:rgba(28,46,44,.78);z-index:500;display:none;align-items:center;justify-content:center;padding:1.5rem;font-family:\'DM Sans\',sans-serif';
+    el.innerHTML = '<div style="background:#fff;border-radius:16px;padding:2rem 1.75rem;max-width:340px;width:100%;text-align:center;box-shadow:0 8px 36px rgba(62,95,92,.25)">'
+      + '<div style="width:38px;height:38px;border:4px solid #E6D5C3;border-top-color:#3E5F5C;border-radius:50%;margin:0 auto 1rem;animation:mccspin .8s linear infinite"></div>'
+      + '<div style="font-family:\'Cormorant Garamond\',serif;font-size:1.35rem;color:#3E5F5C;font-weight:600;margin-bottom:6px">Processing your order</div>'
+      + '<p style="font-size:13px;color:#4A6862;line-height:1.6">Please do not close this window. We are processing your order and it may take a few seconds.</p></div>'
+      + '<style>@keyframes mccspin{to{transform:rotate(360deg)}}</style>';
+    document.body.appendChild(el);
+  }
+  el.style.display = on ? 'flex' : 'none';
 }
 
 function showConfirmation() {
