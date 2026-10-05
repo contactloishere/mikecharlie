@@ -32,6 +32,14 @@ async function openCart() {
     const ids = cart.map(i => i.sku_id).join(',');
     const r = await fetch(`${SB_URL}/rest/v1/skus?id=in.(${ids})&select=*`, { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } });
     const skus = r.ok ? await r.json() : [];
+    // Fetch photos so each bag item shows its picture (variant photo first, then the listing cover)
+    const hdrs = { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY };
+    const [listings, vphotos] = await Promise.all([
+      fetch(`${SB_URL}/rest/v1/product_listings?select=title,cover_image_url`, { headers: hdrs }).then(x => x.ok ? x.json() : []).catch(() => []),
+      fetch(`${SB_URL}/rest/v1/variant_photos?sku_id=in.(${ids})&select=sku_id,photo_url`, { headers: hdrs }).then(x => x.ok ? x.json() : []).catch(() => [])
+    ]);
+    const coverByTitle = {}; listings.forEach(l => { if (l.cover_image_url) coverByTitle[l.title] = l.cover_image_url; });
+    const photoBySku = {}; vphotos.forEach(v => { if (v.photo_url) photoBySku[v.sku_id] = v.photo_url; });
     let total = 0;
     container.innerHTML = cart.map(item => {
       const sku = skus.find(s => s.id === item.sku_id);
@@ -39,7 +47,7 @@ async function openCart() {
       const price = (sku.is_on_sale && sku.sale_price != null) ? sku.sale_price : sku.retail_price_direct;
       const lineTotal = (price || 0) * item.qty; total += lineTotal;
       return `<div class="cart-item">
-        <div class="cart-item-img">🌿</div>
+        <div class="cart-item-img">${(photoBySku[sku.id] || coverByTitle[sku.product_name]) ? `<img src="${photoBySku[sku.id] || coverByTitle[sku.product_name]}" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover;border-radius:8px">` : '🌿'}</div>
         <div class="cart-item-info">
           <div class="cart-item-name">${sku.product_name}</div>
           ${sku.variant ? `<div class="cart-item-var">${sku.variant}</div>` : ''}
@@ -227,7 +235,7 @@ function toggleAccountMenu(e) {
   const menu = document.createElement('div');
   menu.id = 'acct-menu';
   menu.style.cssText = 'position:fixed;top:' + (r.bottom + 6) + 'px;right:' + Math.max(12, window.innerWidth - r.right) + 'px;min-width:170px;background:#fff;border:1px solid #E6D5C3;border-radius:10px;box-shadow:0 8px 36px rgba(62,95,92,.18);padding:6px;z-index:150;font-family:\'DM Sans\',sans-serif';
-  menu.innerHTML = '<a href="/account.html">My Account</a><a href="/account.html#orders">My Orders</a><button type="button" onclick="doLogout()">Log Out</button>';
+  menu.innerHTML = '<a href="/">Shop</a><a href="/account.html">My Account</a><a href="/account.html#orders">My Orders</a><button type="button" onclick="doLogout()">Log Out</button>';
   document.body.appendChild(menu);
 }
 (function addAccountMenuStyles() {
