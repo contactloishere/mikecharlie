@@ -78,6 +78,19 @@ a{color:inherit}
 .pcard-add{margin-top:auto;background:var(--lagoon);color:var(--pearl);border:none;border-radius:8px;padding:8px;font-size:12px;font-weight:500}
 .pcard-add:disabled{background:var(--sand);color:var(--text-muted)}
 
+.pcard.sold{opacity:.55;filter:grayscale(1)}
+.psold{position:absolute;top:8px;right:8px;background:var(--text-dark);color:white;font-size:11px;font-weight:700;letter-spacing:.08em;padding:3px 10px;border-radius:20px;z-index:2}
+
+/* PRELOVED SALE SECTION */
+#preloved-section{display:none;scroll-margin-top:72px;margin-top:1rem}
+.pre-band{background:linear-gradient(135deg,#D9B88C 0%,#D1A679 55%,#C79A66 100%);padding:2.4rem 1.25rem 2.2rem;text-align:center;border-top:1px solid var(--golden-dark);border-bottom:1px solid var(--golden-dark)}
+.pre-band h2{font-size:2rem;font-weight:600;color:var(--lagoon-dark);letter-spacing:.02em;line-height:1.15}
+.pre-band p{max-width:640px;margin:.7rem auto 0;font-size:14px;line-height:1.6;color:var(--lagoon-dark)}
+.pre-band p strong{letter-spacing:.06em}
+.pre-body{background:var(--sand-light);padding:1.5rem 1.25rem 3.5rem}
+.pre-wrap{max-width:1200px;margin:0 auto}
+@media(max-width:759px){.pre-band h2{font-size:1.6rem}}
+
 .load-sentinel{height:40px;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:12px}
 .empty{text-align:center;padding:4rem 1rem;color:var(--text-muted)}
 
@@ -182,6 +195,14 @@ footer{background:var(--text-dark,#1C2E2C);color:rgba(247,243,236,.65);padding:2
   <div class="load-sentinel" id="sentinel"></div>
 </div>
 
+<section id="preloved-section">
+  <div class="pre-band">
+    <h2>Preloved Sale (Decluttering Sale)</h2>
+    <p><strong>DECLUTTERING:</strong> Mike Charlie owner, Lois is letting go of personal items. Well taken care of, and ready for a new home.</p>
+  </div>
+  <div class="pre-body"><div class="pre-wrap"><div class="pgrid" id="pregrid"></div></div></div>
+</section>
+
 <div id="detail-view"></div>
 <div id="toast" class="toast"></div>
 
@@ -239,7 +260,7 @@ const S={
   skus:[], groups:[], categories:[], catFilter:'', displayCount:12,
   cart:JSON.parse(localStorage.getItem('mcc_cart')||'[]'),
   likes:new Set(JSON.parse(localStorage.getItem('mcc_likes')||'[]')),
-  currentGroupIdx:null, currentVariantIdx:0
+  currentGroupIdx:null, currentVariantIdx:0, preCount:0, fromPreloved:false
 };
 function saveCart(){localStorage.setItem('mcc_cart',JSON.stringify(S.cart));updateCartBadge();}
 function saveLikes(){localStorage.setItem('mcc_likes',JSON.stringify([...S.likes]));}
@@ -271,6 +292,7 @@ async function init(){
     groupProducts();
     renderCatBar();
     renderGrid();
+    renderPreloved();
     updateCartBadge();
     handleRoute();
   }catch(e){
@@ -310,33 +332,81 @@ function galleryFor(sku){
   return imgs;
 }
 
+/* ─── PRELOVED HELPERS ───
+   A product counts as Preloved when its category name contains the word "preloved". */
+function isPrelovedCat(c){return !!(c && /preloved/i.test(c.name||''));}
+function isPrelovedGroup(g){return isPrelovedCat(g[0].categories);}
+function isPrelovedSku(sku){return isPrelovedCat(sku.categories);}
+function groupSold(g){return g.every(v=>v.current_stock<=0);}
+
+/* gi is always the position of the group in S.groups, so it is the same no matter which grid the card is in. */
+function mainEntries(){
+  const out=[];
+  S.groups.forEach((g,gi)=>{
+    if(isPrelovedGroup(g))return;
+    if(S.catFilter && !(g[0].categories && g[0].categories.id===S.catFilter))return;
+    out.push({g,gi});
+  });
+  return out;
+}
+function prelovedEntries(){
+  const avail=[],sold=[];
+  S.groups.forEach((g,gi)=>{
+    if(!isPrelovedGroup(g))return;
+    (groupSold(g)?sold:avail).push({g,gi});
+  });
+  return avail.concat(sold); // sold items go to the bottom
+}
+
 /* ─── CATEGORY BAR ─── */
 function renderCatBar(){
+  const hasPre=S.groups.some(isPrelovedGroup);
   $('cat-bar').innerHTML=`
     <button class="cat-chip ${S.catFilter===''?'on':''}" onclick="setCatFilter('')">All</button>
-    ${S.categories.map(c=>`<button class="cat-chip ${S.catFilter===c.id?'on':''}" onclick="setCatFilter('${c.id}')">${c.name}</button>`).join('')}
+    ${S.categories.map(c=>{
+      if(isPrelovedCat(c)){
+        // The Preloved pill jumps down to the Preloved section instead of filtering
+        return hasPre?`<button class="cat-chip" onclick="scrollToPreloved()">${c.name}</button>`:'';
+      }
+      return `<button class="cat-chip ${S.catFilter===c.id?'on':''}" onclick="setCatFilter('${c.id}')">${c.name}</button>`;
+    }).join('')}
   `;
 }
 function setCatFilter(id){S.catFilter=id;S.displayCount=12;renderCatBar();renderGrid();}
 
 /* ─── GRID ─── */
-function filteredGroups(){
-  if(!S.catFilter)return S.groups;
-  return S.groups.filter(g=>g[0].categories && g[0].categories.id===S.catFilter);
-}
 function renderGrid(){
-  const groups=filteredGroups();
-  if(!groups.length){$('pgrid').innerHTML=`<div class="empty" style="grid-column:1/-1">No products in this category yet.</div>`;return;}
-  const visible=groups.slice(0,S.displayCount);
-  $('pgrid').innerHTML=visible.map((g,gi)=>productCardHtml(g,gi)).join('');
-  visible.forEach((g,gi)=>bindCardEvents(gi));
-  $('sentinel').textContent = S.displayCount<groups.length ? 'Loading more…' : (groups.length?'':'');
+  const entries=mainEntries();
+  if(!entries.length){$('pgrid').innerHTML=`<div class="empty" style="grid-column:1/-1">No products in this category yet.</div>`;$('sentinel').textContent='';return;}
+  const visible=entries.slice(0,S.displayCount);
+  $('pgrid').innerHTML=visible.map(e=>productCardHtml(e.g,e.gi)).join('');
+  visible.forEach(e=>bindCardEvents(e.gi));
+  $('sentinel').textContent = S.displayCount<entries.length ? 'Loading more…' : '';
+}
+function renderPreloved(){
+  const entries=prelovedEntries();
+  S.preCount=entries.length;
+  $('pregrid').innerHTML=entries.map(e=>productCardHtml(e.g,e.gi)).join('');
+  entries.forEach(e=>bindCardEvents(e.gi));
+  updatePrelovedVisibility();
+}
+function updatePrelovedVisibility(){
+  $('preloved-section').style.display = S.preCount>0 ? 'block' : 'none';
+}
+function scrollToPreloved(){
+  const sec=$('preloved-section');
+  if(!sec || !S.preCount)return;
+  // Load every regular product first, so the page does not jump while we scroll down
+  const total=mainEntries().length;
+  if(S.displayCount<total){S.displayCount=total;renderGrid();}
+  requestAnimationFrame(()=>sec.scrollIntoView({behavior:'smooth',block:'start'}));
 }
 function productCardHtml(group,gi){
   const sku=group[0]; // default to first variant
   const imgs=galleryFor(sku);
   const price=effectivePrice(sku);
-  const low=sku.current_stock<=sku.low_stock_threshold && sku.current_stock>0;
+  const pre=isPrelovedSku(sku);
+  const low=!pre && sku.current_stock<=sku.low_stock_threshold && sku.current_stock>0; // one-of-a-kind items never say "Last 1 left"
   const out=sku.current_stock<=0;
   const twoAxis=isTwoAxis(group);
   let variantControlHtml='';
@@ -354,14 +424,14 @@ function productCardHtml(group,gi){
         ${group.map(v=>`<option>${v.variant||v.sku_code}</option>`).join('')}
       </select>`;
   }
-  return `<div class="pcard">
+  return `<div class="pcard ${pre&&out?'sold':''}" id="pcard-${gi}">
     <div class="pcard-gallery" data-gi="${gi}">
       <div class="pcard-scroll" id="cardscroll-${gi}">
         ${imgs.length?imgs.map(u=>`<img src="${u}" loading="lazy">`).join(''):`<div class="pcard-ph">🌿</div>`}
       </div>
       ${imgs.length>1?`<div class="pcard-dots">${imgs.map((_,i)=>`<button class="pdot ${i===0?'on':''}" onclick="event.stopPropagation();scrollCard(${gi},${i})"></button>`).join('')}</div>`:''}
       ${sku.ribbon_text?`<div class="pribbon">${sku.ribbon_text}</div>`:''}
-      ${low?`<div class="plow">Last ${sku.current_stock} left</div>`:out?`<div class="plow" style="background:var(--text-muted)">Out of Stock</div>`:''}
+      ${low?`<div class="plow">Last ${sku.current_stock} left</div>`:out?(pre?`<div class="psold" id="cardsold-${gi}">SOLD</div>`:`<div class="plow" style="background:var(--text-muted)">Out of Stock</div>`):(pre?`<div class="psold" id="cardsold-${gi}" style="display:none">SOLD</div>`:'')}
       <button class="plike" onclick="event.stopPropagation();toggleLike('${sku.id}',this)">${S.likes.has(sku.id)?'❤️':'🤍'}</button>
     </div>
     <div class="pcard-body" onclick="openDetail(${gi})">
@@ -372,7 +442,7 @@ function productCardHtml(group,gi){
         <span class="pcard-price" id="cardprice-${gi}">${price!=null?P(price):'—'}</span>
         ${sku.is_on_sale&&sku.sale_price!=null?`<span class="pcard-strike" id="cardstrike-${gi}">${P(sku.retail_price_direct)}</span>`:''}
       </div>
-      <button class="pcard-add" id="cardadd-${gi}" onclick="event.stopPropagation();quickAdd(${gi})" ${out?'disabled':''}>${out?'Out of Stock':'Add to Tote Bag'}</button>
+      <button class="pcard-add" id="cardadd-${gi}" onclick="event.stopPropagation();quickAdd(${gi})" ${out?'disabled':''}>${out?(pre?'Sold':'Out of Stock'):'Add to Tote Bag'}</button>
     </div>
   </div>`;
 }
@@ -393,24 +463,29 @@ function updateCardForSku(gi,sku){
   $('cardprice-'+gi).textContent=price!=null?P(price):'—';
   const addBtn=$('cardadd-'+gi);
   const out=sku.current_stock<=0;
-  addBtn.disabled=out;addBtn.textContent=out?'Out of Stock':'Add to Tote Bag';
+  const pre=isPrelovedSku(sku);
+  addBtn.disabled=out;addBtn.textContent=out?(pre?'Sold':'Out of Stock'):'Add to Tote Bag';
   addBtn.dataset.skuId=sku.id;
+  if(pre){
+    const card=$('pcard-'+gi);if(card)card.classList.toggle('sold',out);
+    const tag=$('cardsold-'+gi);if(tag)tag.style.display=out?'block':'none';
+  }
 }
 function cardVariantChange(gi,variantIdx){
-  const group=filteredGroups()[gi];
+  const group=S.groups[gi];
   const sku=group[variantIdx];
   updateCardForSku(gi,sku);
   $('cardadd-'+gi).setAttribute('onclick',`event.stopPropagation();quickAddVariant(${gi},${variantIdx})`);
 }
 function cardAxis1Change(gi,axis1){
-  const group=filteredGroups()[gi];
+  const group=S.groups[gi];
   const a2opts=axis2Options(group,axis1);
   const a2sel=$('card-axis2-'+gi);
   a2sel.innerHTML=a2opts.map(a=>`<option>${a}</option>`).join('');
   cardAxis2Change(gi,a2opts[0]);
 }
 function cardAxis2Change(gi,axis2){
-  const group=filteredGroups()[gi];
+  const group=S.groups[gi];
   const axis1=$('card-axis1-'+gi).value;
   const sku=findByAxes(group,axis1,axis2);
   if(!sku)return;
@@ -419,7 +494,7 @@ function cardAxis2Change(gi,axis2){
 }
 function quickAdd(gi){quickAddVariant(gi,0);}
 function quickAddVariant(gi,variantIdx){
-  const group=filteredGroups()[gi];
+  const group=S.groups[gi];
   const sku=group[variantIdx];
   addToCart(sku.id,1);
 }
@@ -437,7 +512,7 @@ function toggleLike(skuId,btn){
 /* ─── INFINITE SCROLL ─── */
 new IntersectionObserver((entries)=>{
   if(entries[0].isIntersecting){
-    const total=filteredGroups().length;
+    const total=mainEntries().length;
     if(S.displayCount<total){S.displayCount+=12;renderGrid();}
   }
 },{rootMargin:'200px'}).observe($('sentinel'));
@@ -455,16 +530,19 @@ function handleRoute(){
     }
   }
   showGrid(false);
+  // Links like /?category=preloved open the shop and slide down to the Preloved section
+  if(params.get('category')==='preloved')setTimeout(scrollToPreloved,60);
 }
 window.addEventListener('popstate',handleRoute);
 
 function openDetail(gi){showDetail(gi,0,true);}
 function showDetail(gi,variantIdx,pushUrl){
-  const groups=filteredGroups();
-  const group = groups[gi] || S.groups[gi];
+  const group=S.groups[gi];
   if(!group)return;
   S.currentGroupIdx=gi;S.currentVariantIdx=variantIdx;
+  S.fromPreloved=isPrelovedGroup(group);
   $('grid-view').style.display='none';
+  $('preloved-section').style.display='none';
   $('detail-view').style.display='block';
   $('cat-bar').style.display='none';
   renderDetail(group,variantIdx);
@@ -478,19 +556,25 @@ function showGrid(pushUrl){
   $('grid-view').style.display='block';
   $('detail-view').style.display='none';
   $('cat-bar').style.display='flex';
+  updatePrelovedVisibility();
   if(pushUrl)history.pushState({},'',location.pathname);
+  // Coming back from a Preloved item? Return to the Preloved section, not the top of the shop
+  if(S.fromPreloved){S.fromPreloved=false;setTimeout(scrollToPreloved,40);}
 }
 
 let detailQty=1;
+let detailMax=Infinity;
 function renderDetail(group,variantIdx){
   detailQty=1;
   const sku=group[variantIdx];
   const imgs=galleryFor(sku);
   const price=effectivePrice(sku);
-  const low=sku.current_stock<=sku.low_stock_threshold && sku.current_stock>0;
+  const pre=isPrelovedSku(sku);
+  const low=!pre && sku.current_stock<=sku.low_stock_threshold && sku.current_stock>0;
   const out=sku.current_stock<=0;
+  detailMax=pre?Math.max(1,sku.current_stock):Infinity; // one-of-a-kind items: can't buy more than we have
   const l=sku.listing||{};
-  const subs=[1,2,3,4].map(n=>({title:l['subsection_'+n+'_title'],body:l['subsection_'+n+'_body']})).filter(s=>s.title||s.body);
+  const subs=[1,2,3,4,5].map(n=>({title:l['subsection_'+n+'_title'],body:l['subsection_'+n+'_body']})).filter(s=>s.title||s.body);
   const twoAxis=isTwoAxis(group);
 
   let variantControlHtml='';
@@ -513,7 +597,7 @@ function renderDetail(group,variantIdx){
   }
 
   $('detail-view').innerHTML=`
-    <button class="back-link" onclick="showGrid(true)">← Back to Shop</button>
+    <button class="back-link" onclick="showGrid(true)">${pre?'← Back to Preloved Sale':'← Back to Shop'}</button>
     <div class="detail-grid">
       <div class="detail-gallery">
         <div class="detail-scroll" id="detailscroll">
@@ -521,7 +605,7 @@ function renderDetail(group,variantIdx){
         </div>
         ${imgs.length>1?`<div class="detail-dots">${imgs.map((_,i)=>`<button class="ddot ${i===0?'on':''}" onclick="scrollDetail(${i})"></button>`).join('')}</div>`:''}
         ${sku.ribbon_text?`<div class="pribbon">${sku.ribbon_text}</div>`:''}
-        ${low?`<div class="plow">Last ${sku.current_stock} left</div>`:out?`<div class="plow" style="background:var(--text-muted)">Out of Stock</div>`:''}
+        ${low?`<div class="plow">Last ${sku.current_stock} left</div>`:out?(pre?`<div class="psold">SOLD</div>`:`<div class="plow" style="background:var(--text-muted)">Out of Stock</div>`):''}
       </div>
       <div>
         <h2 class="detail-name">${group[0].product_name}</h2>
@@ -530,15 +614,15 @@ function renderDetail(group,variantIdx){
           ${sku.is_on_sale&&sku.sale_price!=null?`<span class="detail-strike" id="detailstrike">${P(sku.retail_price_direct)}</span>`:''}
         </div>
         ${variantControlHtml}
-        <label class="lbl">Quantity</label>
+        ${(pre&&detailMax<=1)?'':`<label class="lbl">Quantity</label>
         <div class="qty-row">
           <button class="qty-btn" onclick="changeQty(-1)">−</button>
           <span class="qty-val" id="detail-qty">1</span>
           <button class="qty-btn" onclick="changeQty(1)">+</button>
-        </div>
+        </div>`}
         <div class="detail-btns">
           <button class="btn btn-o ${S.likes.has(sku.id)?'liked':''}" id="detail-like" onclick="toggleDetailLike('${sku.id}')">${S.likes.has(sku.id)?'❤️':'🤍'}</button>
-          <button class="btn btn-p" id="detail-add" ${out?'disabled':''} onclick="detailAddToCart()">Add to Tote Bag</button>
+          <button class="btn btn-p" id="detail-add" ${out?'disabled':''} onclick="detailAddToCart()">${out&&pre?'Sold':'Add to Tote Bag'}</button>
           <button class="btn btn-g" id="detail-buy" ${out?'disabled':''} onclick="detailBuyNow()">Buy Now</button>
         </div>
         ${l.long_description?`<p class="detail-desc">${l.long_description}</p>`:''}
@@ -561,21 +645,22 @@ function toggleSub(i){
   $('subarrow-'+i).textContent=$('subbody-'+i).classList.contains('open')?'▲':'▼';
 }
 function changeQty(delta){
-  detailQty=Math.max(1,detailQty+delta);
+  detailQty=Math.min(detailMax,Math.max(1,detailQty+delta));
+  if(detailMax!==Infinity && delta>0 && detailQty===detailMax)toast('Only '+detailMax+' available.');
   $('detail-qty').textContent=detailQty;
 }
 function detailVariantChange(idx){
   showDetail(S.currentGroupIdx,idx,true);
 }
 function detailAxis1Change(axis1){
-  const group=filteredGroups()[S.currentGroupIdx]||S.groups[S.currentGroupIdx];
+  const group=S.groups[S.currentGroupIdx];
   const a2opts=axis2Options(group,axis1);
   const sku=findByAxes(group,axis1,a2opts[0]);
   const idx=group.indexOf(sku);
   showDetail(S.currentGroupIdx,idx,true);
 }
 function detailAxis2Change(axis2){
-  const group=filteredGroups()[S.currentGroupIdx]||S.groups[S.currentGroupIdx];
+  const group=S.groups[S.currentGroupIdx];
   const axis1=$('detail-axis1').value;
   const sku=findByAxes(group,axis1,axis2);
   const idx=group.indexOf(sku);
@@ -589,7 +674,7 @@ function toggleDetailLike(skuId){
   syncLikeToServer(skuId,nowLiked);
 }
 function currentDetailSku(){
-  const group=filteredGroups()[S.currentGroupIdx]||S.groups[S.currentGroupIdx];
+  const group=S.groups[S.currentGroupIdx];
   return group[S.currentVariantIdx];
 }
 function detailAddToCart(){
@@ -604,7 +689,18 @@ function detailBuyNow(){
 
 /* ─── CART ─── */
 function addToCart(skuId,qty,silent){
+  const sku=S.skus.find(s=>s.id===skuId);
   const existing=S.cart.find(i=>i.sku_id===skuId);
+  // Preloved items are one-of-a-kind: never let the tote bag hold more than we have
+  if(sku && isPrelovedSku(sku)){
+    const have=existing?existing.qty:0;
+    if(sku.current_stock<=0){toast('Sorry, this item is already sold.');return;}
+    if(have+qty>sku.current_stock){
+      if(!silent)toast(have>=sku.current_stock?'This item is already in your tote bag.':'Only '+sku.current_stock+' available.');
+      if(have>=sku.current_stock)return;
+      qty=sku.current_stock-have;
+    }
+  }
   if(existing)existing.qty+=qty;
   else S.cart.push({sku_id:skuId,qty});
   saveCart();
@@ -652,7 +748,10 @@ function renderCart(){
   $('cart-total').textContent=P(total);
 }
 function changeCartQty(idx,delta){
-  S.cart[idx].qty=Math.max(1,S.cart[idx].qty+delta);
+  const sku=S.skus.find(s=>s.id===S.cart[idx].sku_id);
+  let q=Math.max(1,S.cart[idx].qty+delta);
+  if(sku && isPrelovedSku(sku) && q>sku.current_stock){q=Math.max(1,sku.current_stock);toast('Only '+sku.current_stock+' available.');}
+  S.cart[idx].qty=q;
   saveCart();renderCart();
 }
 function removeCartItem(idx){
