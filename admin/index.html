@@ -189,6 +189,7 @@ tbody tr:hover td.frz{background:var(--pearl)}
   </div>
   <div class="tabs">
     <button class="tab on" onclick="goTab('home',this)">🏠 Home</button>
+    <button class="tab" onclick="goTab('updates',this)">🔔 Updates <span id="updates-badge" style="display:none;background:var(--danger);color:#fff;font-size:10px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:3px;vertical-align:middle"></span></button>
     <button class="tab" onclick="goTab('takeorder',this)">🛍️ Take Order</button>
     <button class="tab" onclick="goTab('orders',this)">🧾 Member Orders</button>
     <button class="tab" onclick="goTab('inventory',this)">📦 Inventory</button>
@@ -331,5 +332,6 @@ tbody tr:hover td.frz{background:var(--pearl)}
 <script src="admin/reports-tab.js"></script>
 <script src="admin/take-order-tab.js"></script>
 <script src="admin/orders-tab.js"></script>
+<script src="admin/updates-tab.js"></script>
 </body>
 </html>
