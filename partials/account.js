@@ -197,7 +197,8 @@ function switchOrderTab(which) {
   const tabs = document.querySelector('.order-tabs');
   if (tabs) tabs.style.display = 'flex';
   document.querySelectorAll('.order-tab').forEach(b => b.classList.toggle('on', b.dataset.ot === which));
-  const filtered = ACC.orders.filter(o => which === 'current' ? o.current_stage !== 'shipped' : o.current_stage === 'shipped');
+  const isPast = o => o.current_stage === 'shipped' || o.is_cancelled;
+  const filtered = ACC.orders.filter(o => which === 'current' ? !isPast(o) : isPast(o));
   if (!filtered.length) {
     $('orders-list').innerHTML = `<div class="empty-note">No ${which} orders.</div>`;
     return;
@@ -211,6 +212,7 @@ const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&a
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
 
 function currentStatusLabel(order) {
+  if (order.is_cancelled) return 'Cancelled';
   if (order.current_stage === 'shipped' && order.courier) return `Order picked up by ${order.courier === 'spx' ? 'SPX' : 'J&T'}`;
   return STAGE_LABELS[order.current_stage] || 'Order placed';
 }
@@ -231,7 +233,7 @@ function renderOrderSummary(order) {
   return `<div class="order-card clickable" onclick="openOrderDetail('${order.id}')">
     <div class="order-hdr">
       <span class="order-id">Order #${order.id.slice(0, 8)} &middot; ${fmtDate(order.created_at)}</span>
-      <span class="status-pill ${pill}">${esc(currentStatusLabel(order))}</span>
+      <span class="status-pill ${pill}"${order.is_cancelled ? ' style="background:#E6D5C3;color:#4A6862"' : ''}>${esc(currentStatusLabel(order))}</span>
     </div>
     <div class="order-thumbs">${thumbs}${more}</div>
     <div class="order-sum-row">
@@ -292,7 +294,7 @@ function renderOrderDetail(order) {
   const pct = Math.round((currentIdx / (STAGES.length - 1)) * 100);
   const platformLabel = (CONTACT_PLATFORMS.find(p => p.key === order.contact_platform) || {}).label || order.contact_platform || '';
   const payLabel = PAYMENT_LABELS[order.payment_method] || order.payment_method || '';
-  const payStatus = currentIdx >= 2 ? 'Payment confirmed' : 'Waiting for payment verification';
+  const payStatus = order.is_cancelled ? 'Cancelled' : currentIdx >= 2 ? 'Payment confirmed' : 'Waiting for payment verification';
 
   const itemRows = items.map(it => `<div class="detail-item">
       ${thumbHtml(it, 'detail-thumb')}
@@ -311,12 +313,14 @@ function renderOrderDetail(order) {
         <span class="order-id">Order #${order.id.slice(0, 8)}</span>
         <span class="order-id">Placed ${fmtDate(order.created_at)}</span>
       </div>
-      <div class="progress-track">
+      ${order.is_cancelled
+        ? `<div class="empty-note" style="padding:1rem 0">This order was cancelled${order.cancelled_at ? ' on ' + fmtDate(order.cancelled_at) : ''}. If you have questions, please message us from the Message tab.</div>`
+        : `<div class="progress-track">
         <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
         <div class="progress-pct">${pct}%</div>
       </div>
       <div class="stage-list">${buildStageRows(order)}</div>
-      ${buildTrackingHtml(order)}
+      ${buildTrackingHtml(order)}`}
     </div>
 
     <div class="card">
