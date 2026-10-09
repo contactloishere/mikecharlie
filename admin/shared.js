@@ -101,6 +101,7 @@ async function enterApp(authData, displayEmail){
     catch(e){/* will simply prompt for login again next visit */}
   },45*60*1000);
   initInventoryData().then(()=>renderHome());
+  if(typeof startUpdatesBadge==='function')startUpdatesBadge();
 }
 
 async function tryRestoreSession(){
@@ -192,6 +193,7 @@ function goTab(name,btn){
   if(name==='reports')renderDataReports();
   if(name==='products')renderProducts();
   if(name==='orders')renderMemberOrders();
+  if(name==='updates')renderUpdates();
 }
 
 /* ─── LOAD DATA ─── */
