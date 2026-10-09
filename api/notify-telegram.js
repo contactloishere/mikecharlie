@@ -21,12 +21,19 @@ export default async function handler(req, res) {
   }
 
   try {
-    const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    const send = (extra) => fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'Markdown' })
+      body: JSON.stringify(Object.assign({ chat_id: chatId, text: message }, extra))
     });
-    const data = await r.json();
+    let r = await send({ parse_mode: 'Markdown' });
+    let data = await r.json();
+    // Emails and names with _ or * can confuse Telegram's bold/italic formatting.
+    // If that happens, send the same message as plain text so it is never lost.
+    if (!r.ok && /parse entities/i.test(data.description || '')) {
+      r = await send({});
+      data = await r.json();
+    }
     if (!r.ok) throw new Error(data.description || 'Telegram API error');
     return res.status(200).json({ success: true });
   } catch (e) {
