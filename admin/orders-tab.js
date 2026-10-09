@@ -33,12 +33,15 @@ async function renderMemberOrders(){
   }
 }
 
-function moCount(stage){return MO.orders.filter(o=>o.current_stage===stage).length;}
+function moCount(stage){return MO.orders.filter(o=>o.current_stage===stage&&!o.is_cancelled).length;}
 
 function setMoFilter(v){MO.filter=v;drawMemberOrders();}
 
 function drawMemberOrders(){
-  const list=MO.filter==='all'?MO.orders:MO.orders.filter(o=>o.current_stage===MO.filter);
+  const list=MO.filter==='all'?MO.orders.filter(o=>!o.is_cancelled)
+    :MO.filter==='cancelled'?MO.orders.filter(o=>o.is_cancelled)
+    :MO.orders.filter(o=>o.current_stage===MO.filter&&!o.is_cancelled);
+  const cancelledCount=MO.orders.filter(o=>o.is_cancelled).length;
   $('body').innerHTML=`
     <div class="stat-strip">
       <div class="stat-box ${moCount('awaiting_payment_verification')?'warn':''}"><div class="stat-num">${moCount('awaiting_payment_verification')}</div><div class="stat-lbl">Awaiting Payment</div></div>
@@ -50,12 +53,14 @@ function drawMemberOrders(){
       <select class="inp" onchange="setMoFilter(this.value)">
         <option value="all" ${MO.filter==='all'?'selected':''}>All member orders</option>
         ${Object.keys(MO_STAGE_LABEL).map(k=>`<option value="${k}" ${MO.filter===k?'selected':''}>${MO_STAGE_LABEL[k]}</option>`).join('')}
+        <option value="cancelled" ${MO.filter==='cancelled'?'selected':''}>Cancelled (${cancelledCount})</option>
       </select>
     </div>
     ${list.length?list.map(moCard).join(''):'<div class="empty"><div class="empty-i">🧾</div><p>No orders here.</p></div>'}`;
 }
 
-function moPill(stage){
+function moPill(stage,cancelled){
+  if(cancelled)return `<span class="pill-tiny" style="background:var(--sand);color:var(--text-muted)">Cancelled</span>`;
   const style=stage==='shipped'?'background:var(--lagoon);color:white'
     :stage==='awaiting_payment_verification'?'background:var(--sand-light);color:var(--text-mid)'
     :'background:var(--success-bg);color:var(--success)';
@@ -65,7 +70,10 @@ function moPill(stage){
 function moCard(o){
   const items=(MO.itemsByOrder[o.id]||[]).map(i=>`${i.product_name}${i.variant?' ('+i.variant+')':''} ×${i.qty}`).join('<br>');
   let actions='';
-  if(o.current_stage==='awaiting_payment_verification'){
+  if(o.is_cancelled){
+    actions=`<span class="t-muted" style="font-size:12.5px;flex:1">Cancelled${o.cancelled_at?' on '+fmtDate(o.cancelled_at):''}</span>
+      <button class="btn btn-danger btn-sm" onclick="moDelete('${o.id}')">Delete permanently</button>`;
+  }else if(o.current_stage==='awaiting_payment_verification'){
     actions=`<button class="btn btn-p btn-sm" onclick="moAdvance('${o.id}','payment_confirmed')">Mark Payment Confirmed</button>`;
   }else if(o.current_stage==='payment_confirmed'){
     actions=`<button class="btn btn-p btn-sm" onclick="moAdvance('${o.id}','preparing_order')">Mark Preparing</button>`;
@@ -81,13 +89,14 @@ function moCard(o){
     const t=o.tracking||{};
     actions=`<span class="t-muted" style="font-size:12.5px">Shipped via ${o.courier==='spx'?'SPX':'J&T'} — ${t.link||t.number||''}</span>`;
   }
-  return `<div class="card">
+  const cancelBtn=o.is_cancelled?'':`<button class="btn btn-o btn-sm" style="margin-left:auto;color:var(--danger);border-color:var(--danger)" onclick="moCancel('${o.id}')">Cancel Order</button>`;
+  return `<div class="card" style="${o.is_cancelled?'opacity:.7':''}">
     <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
       <div>
         <div class="t-muted" style="font-size:12px">#${o.id.slice(0,8)} · ${fmtDate(o.created_at)}</div>
         <div style="font-weight:600;color:var(--lagoon)">${o.customer_name}</div>
       </div>
-      <div style="text-align:right"><div style="font-weight:600">${P(o.total)}</div>${moPill(o.current_stage)}</div>
+      <div style="text-align:right"><div style="font-weight:600">${P(o.total)}</div>${moPill(o.current_stage,o.is_cancelled)}</div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;font-size:12.5px;line-height:1.7;margin-bottom:10px">
       <div>
@@ -103,7 +112,7 @@ function moCard(o){
         <div style="margin-top:4px">Subtotal ${P(o.subtotal)} + Shipping ${P(o.shipping_fee)}</div>
       </div>
     </div>
-    <div style="border-top:1px solid var(--sand-light);padding-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">${actions}</div>
+    <div style="border-top:1px solid var(--sand-light);padding-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">${actions}${cancelBtn}</div>
   </div>`;
 }
 
@@ -189,4 +198,47 @@ async function moShip(id){
     toast('✓ Marked as shipped');
     renderMemberOrders();
   }catch(e){toast('Could not update: '+e.message);}
+}
+
+/* ─── CANCEL / DELETE ───
+   Cancel keeps the order on record but marks it cancelled. If payment was
+   already confirmed, the sale is removed and the stock goes back on the shelf. */
+async function moCancel(id){
+  const o=MO.orders.find(x=>x.id===id);
+  if(!o)return;
+  const wasPaid=!!o.sale_id;
+  const shipped=o.current_stage==='shipped';
+  let msg='Cancel this order from '+o.customer_name+'?';
+  if(wasPaid)msg+='\n\nPayment was already confirmed, so the sale will be removed and the stock will be put back.';
+  if(shipped)msg+='\n\nThis order is marked as shipped. Cancel it only if it is a test order.';
+  if(!confirm(msg))return;
+  try{
+    if(wasPaid){
+      const items=(MO.itemsByOrder[o.id]||[]).filter(i=>i.sku_id);
+      const ids=items.map(i=>i.sku_id);
+      const rows=ids.length?await sbGet('skus',`id=in.(${ids.join(',')})&select=id,current_stock`):[];
+      const byId={};rows.forEach(r=>byId[r.id]=r);
+      for(const i of items){
+        const cur=byId[i.sku_id];
+        if(cur){await sbUpdate('skus',i.sku_id,{current_stock:(cur.current_stock||0)+i.qty});cur.current_stock=(cur.current_stock||0)+i.qty;}
+      }
+      await sbDelete('sale_items',`sale_id=eq.${o.sale_id}`);
+      await sbDelete('sales',`id=eq.${o.sale_id}`);
+      salesCache=null;
+    }
+    await sbUpdate('mcc_orders',id,{is_cancelled:true,cancelled_at:new Date().toISOString(),sale_id:null});
+    toast(wasPaid?'✓ Order cancelled, stock put back, sale removed':'✓ Order cancelled');
+    renderMemberOrders();
+  }catch(e){toast('Could not cancel: '+e.message);}
+}
+async function moDelete(id){
+  const o=MO.orders.find(x=>x.id===id);
+  if(!o)return;
+  if(!confirm('Permanently delete this cancelled order from '+o.customer_name+'?\n\nThis cannot be undone. Use it for test orders.'))return;
+  try{
+    await sbDelete('mcc_order_items',`order_id=eq.${id}`);
+    await sbDelete('mcc_orders',`id=eq.${id}`);
+    toast('✓ Order deleted');
+    renderMemberOrders();
+  }catch(e){toast('Could not delete: '+e.message);}
 }
