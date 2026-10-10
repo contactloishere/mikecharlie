@@ -4,6 +4,12 @@
    ───────────────────────────────────────────────────────── */
 
 /* ─── INVENTORY TAB ─── */
+/* Same product name + same variant (ignoring capitals and spaces) = likely duplicate */
+function skuKey(s){return (s.product_name||'').trim().toLowerCase()+'|'+(s.variant||'').trim().toLowerCase();}
+function isDupSku(s){
+  const k=skuKey(s);
+  return S.skus.filter(x=>skuKey(x)===k).length>1;
+}
 function filteredSkus(){
   return S.skus.filter(s=>{
     if(S.search){
@@ -14,6 +20,7 @@ function filteredSkus(){
     if(S.catFilter && (!s.categories||s.categories.id!==S.catFilter))return false;
     if(S.locFilter && s.location!==S.locFilter)return false;
     if(S.lowOnly && s.current_stock>s.low_stock_threshold)return false;
+    if(S.dupOnly && !isDupSku(s))return false;
     return true;
   });
 }
@@ -22,6 +29,7 @@ function renderInventory(){
   const list=filteredSkus();
   const lowCount=S.skus.filter(s=>s.current_stock<=s.low_stock_threshold).length;
   const sellableCount=S.skus.filter(s=>s.is_sellable).length;
+  const dupCount=S.skus.filter(isDupSku).length;
 
   let html=`
   <div class="stat-strip">
@@ -45,6 +53,9 @@ function renderInventory(){
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-mid)">
         <input type="checkbox" ${S.lowOnly?'checked':''} onchange="S.lowOnly=this.checked;renderInventory()"> Low stock only
       </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-mid)">
+        <input type="checkbox" ${S.dupOnly?'checked':''} onchange="S.dupOnly=this.checked;renderInventory()"> Possible duplicates only (${dupCount})
+      </label>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-o btn-sm" onclick="openAdjustmentModal()">📋 Other Adjustment</button>
@@ -62,7 +73,7 @@ function renderInventory(){
     list.forEach(s=>{
       const low=s.current_stock<=s.low_stock_threshold;
       html+=`<tr>
-        <td class="frz c1"><strong>${s.product_name}</strong>${s.variant?`<br><span class="t-muted" style="font-size:11px">${s.variant}</span>`:''}</td>
+        <td class="frz c1"><strong>${s.product_name}</strong>${isDupSku(s)?' <span class="pill-tiny" style="background:var(--warn-bg,#FFF0CC);color:var(--warn,#92600A)">Duplicate?</span>':''}${s.variant?`<br><span class="t-muted" style="font-size:11px">${s.variant}</span>`:''}<br><button type="button" onclick="deleteSku('${s.id}')" style="background:none;border:none;padding:2px 0;font-size:11px;color:var(--danger);cursor:pointer;text-decoration:underline">🗑 Delete</button></td>
         <td class="frz c2 ${low?'stock-low':'stock-ok'}" style="box-shadow:2px 0 6px rgba(0,0,0,.05)">${s.current_stock}${low?' ⚠':''}</td>
         <td>${s.sku_code}</td>
         <td>${s.categories?s.categories.name:'<span class="t-muted">Unassigned</span>'}</td>
@@ -276,4 +287,64 @@ async function submitCut(){
     closeModal('cut-modal');
     await initInventoryData();
   }catch(e){toast('Error: '+e.message);}
+}
+
+
+/* ─── DELETE AN ITEM ───
+   Safe rules:
+   - An item that already has sales or orders is NOT deleted (it would break your records). You can hide it instead.
+   - An item used as a raw material in another product's recipe is NOT deleted.
+   - Its own photo, recipe and likes are cleaned up automatically. */
+async function deleteReturning(table,query){
+  const r=await fetch(`${SB_URL}/rest/v1/${table}?${query}`,{method:'DELETE',headers:authHeaders({'Prefer':'return=representation'})});
+  const txt=await r.text();
+  if(!r.ok){const e=new Error(txt);e.status=r.status;throw e;}
+  return txt?JSON.parse(txt):[];
+}
+async function hideSkuInstead(s,why){
+  if(!confirm(why+'\n\nHide it instead? It will disappear from the shop and stay in your records.'))return;
+  try{
+    await sbUpdate('skus',s.id,{is_active:false,is_sellable:false});
+    s.is_active=false;s.is_sellable=false;
+    toast('✓ Item hidden from the shop');
+    renderInventory();
+  }catch(e){toast('Could not update: '+e.message);}
+}
+async function deleteSku(id){
+  const s=S.skus.find(x=>x.id===id);
+  if(!s)return;
+  const label=s.product_name+(s.variant?' ('+s.variant+')':'')+' · '+s.sku_code;
+  if(!confirm('Delete '+label+'?\n\nStock on hand: '+s.current_stock+'. This cannot be undone.'))return;
+  try{
+    const [sales,orders,asRaw]=await Promise.all([
+      sbGet('sale_items',`sku_id=eq.${id}&select=sku_id&limit=1`),
+      sbGet('mcc_order_items',`sku_id=eq.${id}&select=sku_id&limit=1`),
+      sbGet('product_recipes',`raw_material_sku_id=eq.${id}&select=raw_material_sku_id&limit=1`)
+    ]);
+    if(sales.length||orders.length){await hideSkuInstead(s,'This item already has sales or orders, so it cannot be deleted without breaking your records.');return;}
+    if(asRaw.length){await hideSkuInstead(s,'This item is used as a raw material in another product\'s recipe, so it cannot be deleted.');return;}
+
+    const clearable={variant_photos:'sku_id',product_recipes:'finished_sku_id',mcc_likes:'sku_id'};
+    let done=false;
+    for(let attempt=0;attempt<5&&!done;attempt++){
+      try{
+        const gone=await deleteReturning('skus',`id=eq.${id}`);
+        if(!gone.length){toast('Delete was blocked. The delete permission is missing in Supabase (run inventory-delete-setup.sql).');return;}
+        done=true;
+      }catch(e){
+        let info={};try{info=JSON.parse(e.message);}catch(x){}
+        const m=/table "([^"]+)"/.exec((info.details||'')+' '+(info.message||''));
+        const t=m&&m[1];
+        if(e.status===409&&t&&clearable[t]){
+          await deleteReturning(t,`${clearable[t]}=eq.${id}`);   // remove this item's own photo / recipe / likes, then try again
+          continue;
+        }
+        if(e.status===409){await hideSkuInstead(s,'This item is linked to other records'+(t?' ('+t+')':'')+', so it cannot be deleted.');return;}
+        throw e;
+      }
+    }
+    S.skus=S.skus.filter(x=>x.id!==id);
+    toast('✓ Item deleted');
+    renderInventory();
+  }catch(e){toast('Could not delete: '+e.message);}
 }
