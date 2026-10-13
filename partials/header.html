@@ -2,6 +2,19 @@
   /* No underlines on any header links. Active page is bold, others are plain. */
   .hdr-nav-links a, .hdr-nav-links a:hover, .mobile-nav-overlay a, .mobile-nav-overlay a:hover { text-decoration: none !important; }
   .hdr-nav-links a { border-bottom: none !important; }
+  /* "Be Our Hotel Partner" opens a small submenu (hover on computers, tap on phones) */
+  .nav-dd { position: relative; display: inline-block; }
+  .nav-dd-btn { background: none; border: none; padding: 0; font: inherit; cursor: pointer; color: var(--text-mid); }
+  .nav-dd-btn .caret { font-size: 9px; margin-left: 4px; }
+  .nav-dd-menu { display: none; position: absolute; top: 100%; left: -12px; padding-top: 10px; z-index: 250; min-width: 230px; }
+  .nav-dd-menu-inner { background: #fff; border: 1px solid var(--sand, #e6d5c3); border-radius: 10px; box-shadow: 0 8px 24px rgba(62,95,92,.15); padding: 6px; display: flex; flex-direction: column; }
+  .nav-dd-menu a { padding: 9px 12px; border-radius: 7px; white-space: nowrap; }
+  .nav-dd-menu a:hover { background: var(--pearl, #f7f3ec); }
+  .nav-dd:hover .nav-dd-menu, .nav-dd.open .nav-dd-menu { display: block; }
+  .mnav-group { display: flex; flex-direction: column; align-items: center; gap: .9rem; }
+  .mnav-sub { display: none; flex-direction: column; align-items: center; gap: .8rem; }
+  .mnav-group.open .mnav-sub { display: flex; }
+  .mobile-nav-overlay .mnav-sub a { font-size: 1.05rem; font-weight: 500; opacity: .9; }
 </style>
 <div class="hdr">
   <div class="hdr-inner">
@@ -9,7 +22,13 @@
       <a href="/"><img src="https://static.wixstatic.com/media/d7782b_c8da6516ec35423b930841d288841df0~mv2.png" alt="Mike Charlie Co." referrerpolicy="no-referrer" style="height:38px;width:auto;object-fit:contain"></a>
       <div class="hdr-nav-links">
         <a href="/" data-nav="shop">Shop</a>
-        <a href="/hotel-partner-program" data-nav="hotel-partner-program">Hotel Partner Program</a>
+        <div class="nav-dd" id="nav-dd">
+          <button type="button" class="nav-dd-btn" data-nav="hotel" aria-haspopup="true" onclick="toggleNavDd(event)">Be Our Hotel Partner <span class="caret">▾</span></button>
+          <div class="nav-dd-menu"><div class="nav-dd-menu-inner">
+            <a href="/hotel-partner-program" data-nav="hotel-partner-program">Hotel Partner Program</a>
+            <a href="/hotel-portal" data-nav="hotel-portal">Hotel Partner Log In / Sign Up</a>
+          </div></div>
+        </div>
         <a href="/?category=preloved" data-nav="preloved">Preloved Sale (Decluttering Sale)</a>
       </div>
     </div>
@@ -24,20 +43,31 @@
 <div class="mobile-nav-overlay" id="mobile-nav-overlay">
   <button class="mobile-nav-close" onclick="closeMobileNav()">✕</button>
   <a href="/">Shop</a>
-  <a href="/hotel-partner-program">Hotel Partner Program</a>
+  <div class="mnav-group" id="mnav-hotel">
+    <button class="mnav-item" type="button" onclick="document.getElementById('mnav-hotel').classList.toggle('open')">Be Our Hotel Partner ▾</button>
+    <div class="mnav-sub">
+      <a href="/hotel-partner-program">Hotel Partner Program</a>
+      <a href="/hotel-portal">Hotel Partner Log In / Sign Up</a>
+    </div>
+  </div>
   <a href="/?category=preloved">Preloved Sale (Decluttering Sale)</a>
   <div id="mnav-auth" style="display:contents"><button class="mnav-item" onclick="closeMobileNav();openAuthModal()">Log In / Sign Up</button></div>
 </div>
 
 <script>
+function toggleNavDd(e){ if(e) e.stopPropagation(); const d=document.getElementById('nav-dd'); if(d) d.classList.toggle('open'); }
+document.addEventListener('click', function(e){ const d=document.getElementById('nav-dd'); if(d && !d.contains(e.target)) d.classList.remove('open'); });
 // Highlight the current page's nav link once the header is injected
 (function(){
   const path = window.location.pathname.replace(/\/$/, '') || '/';
   const params = new URLSearchParams(window.location.search);
   const isPreloved = (path === '' || path === '/') && params.get('category') === 'preloved';
+  const inHotel = path.includes('hotel-partner-program') || path.includes('hotel-portal');
+  const hb = document.querySelector('.nav-dd-btn');
+  if (hb) { hb.style.color = inHotel ? 'var(--lagoon)' : 'var(--text-mid)'; hb.style.fontWeight = inHotel ? '700' : '400'; }
   document.querySelectorAll('.hdr-nav-links a').forEach(a=>{
     const isShop = a.dataset.nav === 'shop' && (path === '' || path === '/') && !isPreloved;
-    const isHotel = a.dataset.nav === 'hotel-partner-program' && path.includes('hotel-partner-program');
+    const isHotel = (a.dataset.nav === 'hotel-partner-program' && path.includes('hotel-partner-program')) || (a.dataset.nav === 'hotel-portal' && path.includes('hotel-portal'));
     const isPrelovedLink = a.dataset.nav === 'preloved' && isPreloved;
     if (isShop || isHotel || isPrelovedLink) {
       a.style.color = 'var(--lagoon)';
@@ -51,7 +81,7 @@
   document.querySelectorAll('.mobile-nav-overlay a').forEach(a=>{
     const href = a.getAttribute('href') || '';
     const isShop = href === '/' && (path === '' || path === '/') && !isPreloved;
-    const isHotel = href.includes('hotel-partner-program') && path.includes('hotel-partner-program');
+    const isHotel = (href.includes('hotel-partner-program') && path.includes('hotel-partner-program')) || (href.includes('hotel-portal') && path.includes('hotel-portal'));
     const isPrelovedLink = href.includes('category=preloved') && isPreloved;
     a.style.fontWeight = (isShop || isHotel || isPrelovedLink) ? '700' : '400';
   });
