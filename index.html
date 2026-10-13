@@ -480,7 +480,24 @@ function scrollCard(gi,idx){
   const scroller=$('cardscroll-'+gi);
   if(scroller)scroller.scrollTo({left:idx*scroller.clientWidth,behavior:'smooth'});
 }
+function updateCardPhotos(gi,sku){
+  const scroller=$('cardscroll-'+gi);
+  if(!scroller)return;
+  const imgs=galleryFor(sku,true); // picked variant's own photo leads
+  if(!imgs.length)return;
+  scroller.innerHTML=imgs.map(u=>`<img src="${u}" loading="lazy">`).join('');
+  scroller.scrollLeft=0;
+  const g=document.querySelector(`[data-gi="${gi}"]`);
+  if(g){
+    let dots=g.querySelector('.pcard-dots');
+    if(imgs.length>1){
+      if(!dots){dots=document.createElement('div');dots.className='pcard-dots';scroller.insertAdjacentElement('afterend',dots);}
+      dots.innerHTML=imgs.map((_,i)=>`<button class="pdot ${i===0?'on':''}" onclick="event.stopPropagation();scrollCard(${gi},${i})"></button>`).join('');
+    }else if(dots){dots.remove();}
+  }
+}
 function updateCardForSku(gi,sku){
+  updateCardPhotos(gi,sku);
   const price=effectivePrice(sku);
   $('cardprice-'+gi).textContent=price!=null?P(price):'—';
   const addBtn=$('cardadd-'+gi);
