@@ -89,7 +89,7 @@ function renderItems() {
     const lineTotal = (price || 0) * item.qty;
     subtotal += lineTotal;
     return `<div class="co-item">
-      <div class="co-item-img">${sku.coverPhoto ? `<img src="${sku.coverPhoto}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">` : '🌿'}</div>
+      <div class="co-item-img">${sku.coverPhoto ? `<img src="${sku.coverPhoto}" style="width:100%;height:100%;object-fit:contain;border-radius:8px">` : '🌿'}</div>
       <div class="co-item-info">
         <div class="co-item-name">${sku.product_name}</div>
         ${sku.variant ? `<div class="co-item-var">${sku.variant}</div>` : ''}
