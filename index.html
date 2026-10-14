@@ -68,10 +68,10 @@ a{color:inherit}
 @media(min-width:760px){.pgrid{grid-template-columns:repeat(3,1fr)}}
 
 .pcard{background:white;border:1px solid var(--sand);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);display:flex;flex-direction:column;cursor:pointer}
-.pcard-gallery{position:relative;aspect-ratio:1/1;background:var(--sand-light)}
+.pcard-gallery{position:relative;aspect-ratio:1/1;background:#fff}
 .pcard-scroll{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;height:100%;scrollbar-width:none}
 .pcard-scroll::-webkit-scrollbar{display:none}
-.pcard-scroll img{width:100%;height:100%;object-fit:cover;flex-shrink:0;scroll-snap-align:start}
+.pcard-scroll img{width:100%;height:100%;object-fit:contain;flex-shrink:0;scroll-snap-align:start}
 .pcard-ph{width:100%;height:100%;flex-shrink:0;scroll-snap-align:start;display:flex;align-items:center;justify-content:center;font-size:34px;color:var(--teal-light);background:var(--sand-light)}
 .pcard-dots{position:absolute;bottom:8px;left:0;right:0;display:flex;justify-content:center;gap:4px;z-index:2}
 .pdot{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.6);border:none;padding:0;cursor:pointer}
@@ -112,10 +112,10 @@ a{color:inherit}
 .back-link{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text-mid);background:none;border:none;margin-bottom:1rem}
 .detail-grid{display:grid;grid-template-columns:1fr;gap:1.5rem}
 @media(min-width:760px){.detail-grid{grid-template-columns:1fr 1fr;gap:2.5rem}}
-.detail-gallery{position:relative;aspect-ratio:1/1;background:var(--sand-light);border-radius:16px;overflow:hidden}
+.detail-gallery{position:relative;aspect-ratio:1/1;background:#fff;border-radius:16px;overflow:hidden}
 .detail-scroll{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;height:100%;scrollbar-width:none}
 .detail-scroll::-webkit-scrollbar{display:none}
-.detail-scroll img{width:100%;height:100%;object-fit:cover;flex-shrink:0;scroll-snap-align:start}
+.detail-scroll img{width:100%;height:100%;object-fit:contain;flex-shrink:0;scroll-snap-align:start}
 .detail-ph{width:100%;height:100%;flex-shrink:0;scroll-snap-align:start;display:flex;align-items:center;justify-content:center;font-size:60px;color:var(--teal-light)}
 .detail-dots{position:absolute;bottom:14px;left:0;right:0;display:flex;justify-content:center;gap:6px}
 .ddot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.6);border:none;padding:0;cursor:pointer}
@@ -152,7 +152,7 @@ a{color:inherit}
 .cart-close{background:var(--sand);border:none;border-radius:50%;width:32px;height:32px;font-size:16px}
 .cart-items{flex:1;overflow-y:auto;padding:1rem 1.25rem}
 .cart-item{display:flex;gap:10px;padding:12px 0;border-bottom:1px solid var(--sand-light)}
-.cart-item-img{width:56px;height:56px;border-radius:8px;background:var(--sand-light);flex-shrink:0;object-fit:cover;display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--teal-light)}
+.cart-item-img{width:56px;height:56px;border-radius:8px;background:var(--sand-light);flex-shrink:0;object-fit:contain;display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--teal-light)}
 .cart-item-info{flex:1}
 .cart-item-name{font-size:13px;font-weight:500}
 .cart-item-var{font-size:11px;color:var(--text-muted)}
@@ -797,7 +797,7 @@ function renderCart(){
     total+=lineTotal;
     const img=galleryFor(sku,true)[0]||null;
     return `<div class="cart-item">
-      <div class="cart-item-img">${img?`<img src="${img}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">`:'🌿'}</div>
+      <div class="cart-item-img">${img?`<img src="${img}" style="width:100%;height:100%;object-fit:contain;border-radius:8px">`:'🌿'}</div>
       <div class="cart-item-info">
         <div class="cart-item-name">${sku.product_name}</div>
         ${sku.variant?`<div class="cart-item-var">${sku.variant}</div>`:''}
