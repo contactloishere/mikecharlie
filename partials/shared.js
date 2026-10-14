@@ -47,7 +47,7 @@ async function openCart() {
       const price = (sku.is_on_sale && sku.sale_price != null) ? sku.sale_price : sku.retail_price_direct;
       const lineTotal = (price || 0) * item.qty; total += lineTotal;
       return `<div class="cart-item">
-        <div class="cart-item-img">${(photoBySku[sku.id] || coverByTitle[sku.product_name]) ? `<img src="${photoBySku[sku.id] || coverByTitle[sku.product_name]}" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover;border-radius:8px">` : '🌿'}</div>
+        <div class="cart-item-img">${(photoBySku[sku.id] || coverByTitle[sku.product_name]) ? `<img src="${photoBySku[sku.id] || coverByTitle[sku.product_name]}" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:contain;border-radius:8px">` : '🌿'}</div>
         <div class="cart-item-info">
           <div class="cart-item-name">${sku.product_name}</div>
           ${sku.variant ? `<div class="cart-item-var">${sku.variant}</div>` : ''}
