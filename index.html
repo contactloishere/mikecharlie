@@ -614,8 +614,31 @@ new IntersectionObserver((entries)=>{
 },{rootMargin:'200px'}).observe($('sentinel'));
 
 /* ─── ROUTING ─── */
+/* Clean web address for a product: /bamboo-cup (or /bamboo-cup?variant=CODE once a variant is picked).
+   Products without a slug yet fall back to the old ?product=CODE style. */
+function slugOfGroup(g){return g&&g[0]&&g[0].listing&&g[0].listing.slug||'';}
+function productUrl(gi,vi,picked){
+  const g=S.groups[gi];if(!g)return location.pathname;
+  const slug=slugOfGroup(g),sku=g[vi]||g[0];
+  if(!slug)return `?product=${sku.sku_code}`;
+  return '/'+slug+((picked&&g.length>1)?`?variant=${encodeURIComponent(sku.sku_code)}`:'');
+}
 function handleRoute(){
   const params=new URLSearchParams(location.search);
+  // 1. Clean address such as /bamboo-cup
+  const pathSlug=decodeURIComponent(location.pathname).replace(/^\/+|\/+$/g,'').toLowerCase();
+  if(pathSlug && pathSlug!=='index.html'){
+    const gi=S.groups.findIndex(g=>slugOfGroup(g).toLowerCase()===pathSlug);
+    if(gi>-1){
+      const g=S.groups[gi];
+      const wanted=params.get('variant');
+      const vi=wanted?Math.max(0,g.findIndex(v=>v.sku_code===wanted)):0;
+      S.variantPicked=!!wanted&&g.findIndex(v=>v.sku_code===wanted)>-1;S.a1Chosen=null;
+      showDetail(gi,vi,false);
+      return;
+    }
+  }
+  // 2. Old-style address /?product=CODE (links already shared): open it, then tidy the address bar
   const sku=params.get('product');
   if(sku){
     const gi=S.groups.findIndex(g=>g.some(v=>v.sku_code===sku));
@@ -623,6 +646,7 @@ function handleRoute(){
       const vi=S.groups[gi].findIndex(v=>v.sku_code===sku);
       S.variantPicked=vi>0;S.a1Chosen=null;
       showDetail(gi,vi>-1?vi:0,false);
+      if(slugOfGroup(S.groups[gi]))history.replaceState({},'',productUrl(gi,vi>-1?vi:0,S.variantPicked));
       return;
     }
   }
@@ -644,8 +668,7 @@ function showDetail(gi,variantIdx,pushUrl){
   $('cat-bar').style.display='none';
   renderDetail(group,variantIdx);
   if(pushUrl){
-    const sku=group[variantIdx];
-    history.pushState({},'',`?product=${sku.sku_code}`);
+    history.pushState({},'',productUrl(gi,variantIdx,S.variantPicked));
   }
   window.scrollTo(0,0);
 }
@@ -655,7 +678,7 @@ function showGrid(pushUrl){
   $('cat-bar').style.display='flex';
   updatePrelovedVisibility();
   document.querySelectorAll('.pcard-scroll').forEach(refreshArrows);
-  if(pushUrl)history.pushState({},'',location.pathname);
+  if(pushUrl)history.pushState({},'','/');
   // Coming back from a Preloved item? Return to the Preloved section, not the top of the shop
   if(S.fromPreloved){S.fromPreloved=false;setTimeout(scrollToPreloved,40);}
 }
