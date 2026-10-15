@@ -74,8 +74,8 @@ a{color:inherit}
 .pcard-scroll img{width:100%;height:100%;object-fit:contain;flex-shrink:0;scroll-snap-align:start}
 .pcard-ph{width:100%;height:100%;flex-shrink:0;scroll-snap-align:start;display:flex;align-items:center;justify-content:center;font-size:34px;color:var(--teal-light);background:var(--sand-light)}
 .pcard-dots{position:absolute;bottom:8px;left:0;right:0;display:flex;justify-content:center;gap:4px;z-index:2}
-.pdot{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.6);border:none;padding:0;cursor:pointer}
-.pdot.on{background:white;width:6px;height:6px}
+.pdot{width:5px;height:5px;border-radius:50%;background:rgba(62,95,92,.3);border:none;padding:0;cursor:pointer}
+.pdot.on{background:var(--lagoon);width:6px;height:6px}
 .pribbon{position:absolute;top:8px;left:8px;background:var(--golden);color:white;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;z-index:2;letter-spacing:.02em}
 .plow{position:absolute;top:8px;right:8px;background:var(--danger);color:white;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;z-index:2}
 .plike{position:absolute;bottom:8px;right:8px;background:rgba(255,255,255,.9);border:none;border-radius:50%;width:28px;height:28px;font-size:14px;z-index:2;display:flex;align-items:center;justify-content:center}
@@ -118,8 +118,17 @@ a{color:inherit}
 .detail-scroll img{width:100%;height:100%;object-fit:contain;flex-shrink:0;scroll-snap-align:start}
 .detail-ph{width:100%;height:100%;flex-shrink:0;scroll-snap-align:start;display:flex;align-items:center;justify-content:center;font-size:60px;color:var(--teal-light)}
 .detail-dots{position:absolute;bottom:14px;left:0;right:0;display:flex;justify-content:center;gap:6px}
-.ddot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.6);border:none;padding:0;cursor:pointer}
-.ddot.on{background:white;width:8px;height:8px}
+.ddot{width:7px;height:7px;border-radius:50%;background:rgba(62,95,92,.3);border:none;padding:0;cursor:pointer}
+.ddot.on{background:var(--lagoon);width:8px;height:8px}
+/* Sheer left/right photo arrows. Always faintly visible on touch screens, shown on hover on computers. */
+.photo-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:3;width:32px;height:32px;border-radius:50%;border:none;padding:0;background:rgba(255,255,255,.62);color:var(--lagoon);box-shadow:0 1px 6px rgba(28,46,44,.18);display:none;align-items:center;justify-content:center;cursor:pointer;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);transition:opacity .15s,background .15s}
+.photo-arrow:hover{background:rgba(255,255,255,.92)}
+.photo-arrow.prev{left:8px}.photo-arrow.next{right:8px}
+.photo-arrow svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.has-arrows .photo-arrow.show{display:flex}
+@media(hover:hover){.has-arrows .photo-arrow{opacity:0}.has-arrows:hover .photo-arrow{opacity:1}}
+@media(hover:none){.photo-arrow{width:28px;height:28px;background:rgba(255,255,255,.55)}}
+.detail-gallery .photo-arrow{width:38px;height:38px}.detail-gallery .photo-arrow.prev{left:12px}.detail-gallery .photo-arrow.next{right:12px}
 
 .detail-name{font-size:1.7rem;color:var(--lagoon);margin-bottom:6px}
 .detail-price-row{display:flex;align-items:baseline;gap:10px;margin-bottom:1rem}
@@ -457,6 +466,7 @@ function productCardHtml(group,gi){
       <div class="pcard-scroll" id="cardscroll-${gi}">
         ${imgs.length?imgs.map(u=>`<img src="${u}" loading="lazy">`).join(''):`<div class="pcard-ph">🌿</div>`}
       </div>
+      ${arrowsHtml(`stepCard(${gi},-1)`,`stepCard(${gi},1)`)}
       ${imgs.length>1?`<div class="pcard-dots">${imgs.map((_,i)=>`<button class="pdot ${i===0?'on':''}" onclick="event.stopPropagation();scrollCard(${gi},${i})"></button>`).join('')}</div>`:''}
       ${sku.ribbon_text?`<div class="pribbon">${sku.ribbon_text}</div>`:''}
       <div id="cardbadge-${gi}">${multi?'':stockBadgeHtml(sku)}</div>
@@ -480,8 +490,37 @@ function bindCardEvents(gi){
   scroller.addEventListener('scroll',()=>{
     const idx=Math.round(scroller.scrollLeft/scroller.clientWidth);
     document.querySelectorAll(`[data-gi="${gi}"] .pdot`).forEach((d,i)=>d.classList.toggle('on',i===idx));
+    refreshArrows(scroller);
   });
+  refreshArrows(scroller);
 }
+const ARROW_PREV='<svg viewBox="0 0 24 24"><polyline points="15 5 8 12 15 19"/></svg>';
+const ARROW_NEXT='<svg viewBox="0 0 24 24"><polyline points="9 5 16 12 9 19"/></svg>';
+function arrowsHtml(prevJs,nextJs){
+  return `<button type="button" class="photo-arrow prev" aria-label="Previous photo" onclick="event.stopPropagation();${prevJs}">${ARROW_PREV}</button><button type="button" class="photo-arrow next" aria-label="Next photo" onclick="event.stopPropagation();${nextJs}">${ARROW_NEXT}</button>`;
+}
+/* Shows or hides the arrows depending on where the photo strip is (no left arrow on the first photo, no right arrow on the last) */
+function refreshArrows(scroller){
+  if(!scroller)return;
+  const box=scroller.parentElement;
+  const w=scroller.clientWidth||1;
+  const count=Math.round(scroller.scrollWidth/w);
+  const idx=Math.round(scroller.scrollLeft/w);
+  const prev=box.querySelector('.photo-arrow.prev'),next=box.querySelector('.photo-arrow.next');
+  if(!prev||!next)return;
+  box.classList.toggle('has-arrows',count>1);
+  prev.classList.toggle('show',idx>0);
+  next.classList.toggle('show',idx<count-1);
+}
+function stepScroller(scroller,dir){
+  if(!scroller)return;
+  const w=scroller.clientWidth||1;
+  const count=Math.round(scroller.scrollWidth/w);
+  const idx=Math.max(0,Math.min(count-1,Math.round(scroller.scrollLeft/w)+dir));
+  scroller.scrollTo({left:idx*w,behavior:'smooth'});
+}
+function stepCard(gi,dir){stepScroller($('cardscroll-'+gi),dir);}
+function stepDetail(dir){stepScroller($('detailscroll'),dir);}
 function scrollCard(gi,idx){
   const scroller=$('cardscroll-'+gi);
   if(scroller)scroller.scrollTo({left:idx*scroller.clientWidth,behavior:'smooth'});
@@ -493,6 +532,7 @@ function updateCardPhotos(gi,sku){
   if(!imgs.length)return;
   scroller.innerHTML=imgs.map(u=>`<img src="${u}" loading="lazy">`).join('');
   scroller.scrollLeft=0;
+  refreshArrows(scroller);
   const g=document.querySelector(`[data-gi="${gi}"]`);
   if(g){
     let dots=g.querySelector('.pcard-dots');
@@ -614,6 +654,7 @@ function showGrid(pushUrl){
   $('detail-view').style.display='none';
   $('cat-bar').style.display='flex';
   updatePrelovedVisibility();
+  document.querySelectorAll('.pcard-scroll').forEach(refreshArrows);
   if(pushUrl)history.pushState({},'',location.pathname);
   // Coming back from a Preloved item? Return to the Preloved section, not the top of the shop
   if(S.fromPreloved){S.fromPreloved=false;setTimeout(scrollToPreloved,40);}
@@ -664,6 +705,7 @@ function renderDetail(group,variantIdx){
         <div class="detail-scroll" id="detailscroll">
           ${imgs.length?imgs.map(u=>`<img src="${u}">`).join(''):`<div class="detail-ph">🌿</div>`}
         </div>
+        ${arrowsHtml('stepDetail(-1)','stepDetail(1)')}
         ${imgs.length>1?`<div class="detail-dots">${imgs.map((_,i)=>`<button class="ddot ${i===0?'on':''}" onclick="scrollDetail(${i})"></button>`).join('')}</div>`:''}
         ${sku.ribbon_text?`<div class="pribbon">${sku.ribbon_text}</div>`:''}
         ${mustPick?'':stockBadgeHtml(sku)}
@@ -698,8 +740,18 @@ function renderDetail(group,variantIdx){
   if(scroller)scroller.addEventListener('scroll',()=>{
     const idx=Math.round(scroller.scrollLeft/scroller.clientWidth);
     document.querySelectorAll('.ddot').forEach((d,i)=>d.classList.toggle('on',i===idx));
+    refreshArrows(scroller);
   });
+  refreshArrows(scroller);
 }
+document.addEventListener('keydown',e=>{
+  if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight')return;
+  const dv=$('detail-view');
+  if(!dv||dv.style.display==='none')return;
+  const t=e.target&&e.target.tagName;
+  if(t==='INPUT'||t==='SELECT'||t==='TEXTAREA')return;
+  stepDetail(e.key==='ArrowLeft'?-1:1);
+});
 function scrollDetail(idx){const s=$('detailscroll');if(s)s.scrollTo({left:idx*s.clientWidth,behavior:'smooth'});}
 function toggleSub(i){
   $('subbody-'+i).classList.toggle('open');
