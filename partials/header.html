@@ -61,12 +61,14 @@ document.addEventListener('click', function(e){ const d=document.getElementById(
 (function(){
   const path = window.location.pathname.replace(/\/$/, '') || '/';
   const params = new URLSearchParams(window.location.search);
+  // The shop page also answers to clean product addresses like /bamboo-cup, so look for the shop grid instead of the path
+  const onShopPage = !!document.getElementById('grid-view') || path === '' || path === '/';
   const isPreloved = (path === '' || path === '/') && params.get('category') === 'preloved';
   const inHotel = path.includes('hotel-partner-program') || path.includes('hotel-portal');
   const hb = document.querySelector('.nav-dd-btn');
   if (hb) { hb.style.color = inHotel ? 'var(--lagoon)' : 'var(--text-mid)'; hb.style.fontWeight = inHotel ? '700' : '400'; }
   document.querySelectorAll('.hdr-nav-links a').forEach(a=>{
-    const isShop = a.dataset.nav === 'shop' && (path === '' || path === '/') && !isPreloved;
+    const isShop = a.dataset.nav === 'shop' && onShopPage && !isPreloved;
     const isHotel = (a.dataset.nav === 'hotel-partner-program' && path.includes('hotel-partner-program')) || (a.dataset.nav === 'hotel-portal' && path.includes('hotel-portal'));
     const isPrelovedLink = a.dataset.nav === 'preloved' && isPreloved;
     if (isShop || isHotel || isPrelovedLink) {
@@ -80,7 +82,7 @@ document.addEventListener('click', function(e){ const d=document.getElementById(
   // Same idea in the mobile menu: active page bold, everything else plain
   document.querySelectorAll('.mobile-nav-overlay a').forEach(a=>{
     const href = a.getAttribute('href') || '';
-    const isShop = href === '/' && (path === '' || path === '/') && !isPreloved;
+    const isShop = href === '/' && onShopPage && !isPreloved;
     const isHotel = (href.includes('hotel-partner-program') && path.includes('hotel-partner-program')) || (href.includes('hotel-portal') && path.includes('hotel-portal'));
     const isPrelovedLink = href.includes('category=preloved') && isPreloved;
     a.style.fontWeight = (isShop || isHotel || isPrelovedLink) ? '700' : '400';
