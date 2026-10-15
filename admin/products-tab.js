@@ -167,6 +167,7 @@ function openListingDetail(idx){
 function readGeneralFromDom(){
   const listing={
     title:$('pl-title').value,
+    slug:$('pl-slug')?$('pl-slug').value:'',
     cover_image_url:$('pl-cover').value,
     short_description:$('pl-short').value,
     long_description:$('pl-long').value
@@ -200,6 +201,9 @@ function renderListingDetail(){
     <label class="lbl">Title</label>
     <input class="inp" id="pl-title" value="${attrEsc(l.title)}">
     <p class="t-muted" style="font-size:11px;margin:-8px 0 12px">Renaming this updates all ${PS.variants.length} variant(s) under it automatically.</p>
+    <label class="lbl">Web Address (page URL)</label>
+    <input class="inp" id="pl-slug" value="${attrEsc(l.slug)}" placeholder="e.g. bamboo-cup" oninput="this.value=cleanSlug(this.value,true)">
+    <p class="t-muted" style="font-size:11px;margin:-8px 0 12px">Customers will see: <strong>${location.host}/<span id="pl-slug-preview">${attrEsc(l.slug)||'your-product'}</span></strong>. Use lowercase letters, numbers and hyphens. Changing it later breaks links you already shared, so set it once.</p>
     <label class="lbl">Cover Photo URL</label>
     <input class="inp" id="pl-cover" value="${attrEsc(l.cover_image_url)}" placeholder="Paste a photo URL">
     <label class="lbl">Additional Photos (up to 9)</label>
@@ -244,6 +248,15 @@ function renderListingDetail(){
   $('body').innerHTML=html;
 }
 
+const RESERVED_SLUGS=['admin','account','checkout','preloved','hotel-portal','hotel-partner-program','privacy','api','partials','sql','index','robots','sitemap','favicon'];
+/* Turns anything typed into a clean web address: lowercase letters, numbers and single hyphens */
+function cleanSlug(v,keepTrailing){
+  let t=String(v||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+/,'');
+  if(!keepTrailing)t=t.replace(/-+$/,'');
+  const pv=document.getElementById('pl-slug-preview');
+  if(pv)pv.textContent=t.replace(/-+$/,'')||'your-product';
+  return t;
+}
 async function saveGeneral(){
   const oldTitle=PS.currentTitle;
   const dom=readGeneralFromDom();
@@ -252,12 +265,18 @@ async function saveGeneral(){
   if(newTitle!==oldTitle && PS.listings.some(l=>l.title===newTitle && l!==PS.currentListing)){
     toast('Another listing already has that title.');return;
   }
+  const slug=cleanSlug(dom.listing.slug,false);
+  if(slug){
+    if(RESERVED_SLUGS.includes(slug)){toast('"'+slug+'" is reserved for the website. Please pick another web address.');return;}
+    if(PS.listings.some(l=>l.slug===slug && l!==PS.currentListing)){toast('Another product already uses that web address.');return;}
+  }
   const payload={
     title:newTitle,
     cover_image_url:dom.listing.cover_image_url.trim()||null,
     short_description:dom.listing.short_description.trim()||null,
     long_description:dom.listing.long_description.trim()||null
   };
+  if(slug)payload.slug=slug;
   for(let n=1;n<=9;n++)payload['image_'+n]=dom.listing['image_'+n].trim()||null;
   for(let n=1;n<=5;n++){
     payload['subsection_'+n+'_title']=dom.listing['subsection_'+n+'_title'].trim()||null;
