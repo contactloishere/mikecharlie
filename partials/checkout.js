@@ -76,8 +76,11 @@ async function initCheckout() {
     CO.session = null;
     prefillFromGuestStorage();
   }
+  restoreDraft();   // anything typed before a refresh wins over the saved profile
   renderAcctBanner();
   recalcTotals();
+  document.addEventListener('input', saveDraft);
+  document.addEventListener('change', saveDraft);
 }
 
 function renderItems() {
@@ -179,12 +182,20 @@ function onPaymentChange() {
 }
 
 let proofFile = null;
-function onProofSelected() {
+let proofName = '';
+async function onProofSelected() {
   const input = $('f-proof');
   proofFile = input.files[0] || null;
+  CO.proofUrl = null;       // a new photo replaces any earlier saved one
+  proofName = proofFile ? proofFile.name : '';
   const box = $('upload-box');
-  if (proofFile) { box.classList.add('has-file'); $('upload-label').textContent = '✓ ' + proofFile.name; }
-  else { box.classList.remove('has-file'); $('upload-label').textContent = 'Tap to upload a screenshot or photo of your payment'; }
+  if (proofFile) {
+    box.classList.add('has-file'); $('upload-label').textContent = 'Uploading ' + proofFile.name + '...';
+    // Upload right away, so the photo is not lost if the page is refreshed
+    try { CO.proofUrl = await uploadProof(); $('upload-label').textContent = '✓ ' + proofName; }
+    catch (e) { $('upload-label').textContent = '✓ ' + proofName; /* will retry when the order is submitted */ }
+  } else { box.classList.remove('has-file'); $('upload-label').textContent = 'Tap to upload a screenshot or photo of your payment'; }
+  saveDraft();
 }
 
 async function uploadProof() {
@@ -219,6 +230,43 @@ function saveGuestDetails() {
     handle: getFullHandle(),
     region_id: $('f-region').value
   }));
+}
+
+/* ─── KEEP WHAT THEY TYPED IF THE PAGE REFRESHES ─── */
+const DRAFT_KEY = 'mcc_checkout_draft';
+function saveDraft() {
+  try {
+    if (!$('f-name')) return;
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({
+      full_name: $('f-name').value,
+      address: $('f-address').value,
+      contact_number: $('f-contact').value,
+      platform: $('f-platform').value,
+      handle_raw: $('f-handle').value,
+      region_id: $('f-region').value,
+      payment: $('f-payment').value,
+      note: $('f-note').value,
+      proof_url: CO.proofUrl || null,
+      proof_name: proofName || ''
+    }));
+  } catch (e) {}
+}
+function restoreDraft() {
+  try {
+    const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+    if (!d) return;
+    if (d.full_name) $('f-name').value = d.full_name;
+    if (d.address) $('f-address').value = d.address;
+    if (d.contact_number) $('f-contact').value = d.contact_number;
+    if (d.platform) { $('f-platform').value = d.platform; onPlatformChange(); $('f-handle').value = d.handle_raw || ''; }
+    if (d.region_id) $('f-region').value = d.region_id;
+    if (d.payment) { $('f-payment').value = d.payment; onPaymentChange(); }
+    if (d.note) $('f-note').value = d.note;
+    if (d.proof_url) {
+      CO.proofUrl = d.proof_url; proofName = d.proof_name || 'payment photo';
+      $('upload-box').classList.add('has-file'); $('upload-label').textContent = '✓ ' + proofName;
+    }
+  } catch (e) {}
 }
 
 /* ─── LOGGED-IN CUSTOMER PROFILE ─── */
@@ -277,7 +325,7 @@ function validateForm() {
   if (!CO.cart.length) return 'Your tote bag is empty.';
   if (!name || !address || !contact || !platform || !handle || !region) return 'Please fill out all fields in Your Details.';
   if (!payment) return 'Please select a mode of payment.';
-  if (!proofFile) return 'Please upload proof of payment.';
+  if (!proofFile && !CO.proofUrl) return 'Please upload proof of payment.';
   if (CO.shippingFee == null) return 'We couldn\'t calculate shipping for that region/weight — please contact us directly for a manual quote.';
   return null;
 }
@@ -299,9 +347,15 @@ async function submitOrder() {
   showProcessing(true);
 
   try {
-    CO.proofUrl = await uploadProof();
+    if (!CO.proofUrl) CO.proofUrl = await uploadProof();
+
+    // The page makes the order number itself, so the database does not have to
+    // hand the new order back (guests are not allowed to read orders back).
+    const orderId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); });
 
     const orderPayload = {
+      id: orderId,
       customer_id: CO.session ? CO.session.user.id : null,
       customer_name: $('f-name').value.trim(),
       address: $('f-address').value.trim(),
@@ -325,12 +379,17 @@ async function submitOrder() {
         apikey: SB_KEY,
         Authorization: 'Bearer ' + (CO.session ? CO.session.access_token : SB_KEY),
         'Content-Type': 'application/json',
-        Prefer: 'return=representation'
+        Prefer: 'return=minimal'
       },
       body: JSON.stringify(orderPayload)
     });
-    if (!orderRes.ok) throw new Error('Could not submit your order. Please try again.');
-    const [order] = await orderRes.json();
+    if (!orderRes.ok) {
+      let why = '';
+      try { const j = await orderRes.json(); why = j.message || j.hint || j.details || ''; } catch (e) {}
+      console.error('Order failed', orderRes.status, why);
+      throw new Error('Could not submit your order. Please try again.' + (why ? ' (Reason: ' + why + ')' : ''));
+    }
+    const order = { id: orderId };
 
     const items = CO.cart.map(item => {
       const sku = CO.skus.find(s => s.id === item.sku_id);
@@ -370,6 +429,8 @@ async function submitOrder() {
     }
 
     localStorage.setItem('mcc_cart', '[]');
+    try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+    CO.proofUrl = null;
     showConfirmation();
   } catch (e) {
     errBox.textContent = e.message; errBox.style.display = 'block'; window.scrollTo(0, 0);
