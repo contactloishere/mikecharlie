@@ -368,6 +368,8 @@ function variantFormHtml(v,key){
     <input class="inp" id="v-sku-${key}" value="${attrEsc(v.sku_code)}" ${v._isNew?'':'readonly style="background:var(--pearl)"'}>
     <label class="lbl">Current Stock</label>
     <input class="inp" type="number" id="v-stock-${key}" value="${v.current_stock||0}">
+    <label class="lbl">Date received <span class="t-muted">(used only when you change the stock number)</span></label>
+    <input class="inp" type="date" id="v-stockdate-${key}" value="${todayPH()}" max="${todayPH()}">
     <div class="field-row field-row-2">
       <div><label class="lbl">Price – Direct (₱)</label><input class="inp" type="number" step="0.01" id="v-pricedirect-${key}" value="${v.retail_price_direct!=null?v.retail_price_direct:''}"></div>
       <div><label class="lbl">Price – Shopee (₱)</label><input class="inp" type="number" step="0.01" id="v-priceshopee-${key}" value="${v.retail_price_shopee!=null?v.retail_price_shopee:''}"></div>
@@ -460,6 +462,8 @@ async function saveVariant(key){
   const onSale=$('v-onsale-'+key).checked;
   const salePrice=$('v-saleprice-'+key).value;
   if(onSale && !salePrice){toast('Enter a Sale Price, or untick On Sale.');return;}
+  const receivedOn=$('v-stockdate-'+key).value||todayPH();
+  if(receivedOn>todayPH()){toast('Date received cannot be in the future.');return;}
   // Use what is currently shown in General, so a category you just picked is not lost
   const shared=$('ls-cat')?readGeneralFromDom().shared:(PS.sharedSettings||defaultSharedSettings());
   const payload={
@@ -490,6 +494,12 @@ async function saveVariant(key){
   })):[];
 
   try{
+    // What the stock really is right now (a sale may have happened since this page was opened)
+    let oldStock=0;
+    if(!v._isNew){
+      try{const f=await sbGet('skus',`id=eq.${v.id}&select=current_stock`);oldStock=f[0]?f[0].current_stock:0;}
+      catch(e){oldStock=v.current_stock||0;}
+    }
     let savedId;
     if(v._isNew){
       const saved=await sbInsert('skus',payload);
@@ -497,6 +507,20 @@ async function saveVariant(key){
     }else{
       await sbUpdate('skus',v.id,payload);
       savedId=v.id;
+    }
+    // Keep a dated record of every stock change made here (up = stock in, down = correction)
+    const stockDiff=payload.current_stock-oldStock;
+    if(stockDiff!==0){
+      try{
+        await sbInsert('inventory_transactions',{
+          sku_id:savedId,
+          txn_type:stockDiff>0?'restock':'adjustment_other',
+          quantity_change:stockDiff,
+          location:payload.location,
+          notes:`Products tab: stock ${oldStock} to ${payload.current_stock}`,
+          stock_date:receivedOn
+        });
+      }catch(e){toast('Saved, but the stock date could not be recorded: '+e.message);}
     }
     Object.assign(v,payload,{id:savedId,_isNew:false});
 

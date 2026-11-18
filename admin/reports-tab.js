@@ -133,8 +133,13 @@ async function renderDataReports(){
     <div style="width:32px;height:32px;border:3px solid var(--sand);border-top-color:var(--teal);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:1rem"></div>
     <p>Loading reports...</p></div>`;
   try{
-    const [sales]=await Promise.all([fetchSalesData(), loadChartJs()]);
+    const [sales,stockLog]=await Promise.all([
+      fetchSalesData(),
+      sbGet('inventory_transactions','select=stock_date,quantity_change,txn_type,notes,skus(sku_code,product_name,variant)&order=stock_date.desc,created_at.desc&limit=300').catch(()=>[]),
+      loadChartJs()
+    ]);
     const r=computeReports(sales);
+    const txnLabel=t=>({restock:'Stock in',adjustment_other:'Correction',adjustment_return:'Return',adjustment_personal_use:'Personal use',adjustment_freebie:'Freebie',adjustment_damage:'Damaged',cut_finished_add:'Made (cut)',manual_cut_finished_add:'Made (cut)',cut_raw_deduct:'Used in cut',manual_cut_raw_deduct:'Used in cut',sale:'Sale'}[t]||t);
 
     let html=`
     <div class="stat-strip">
@@ -170,6 +175,12 @@ async function renderDataReports(){
       ${r.runwayList.length?`<div class="table-wrap"><table><thead><tr><th>Item</th><th>Current Stock</th><th>Est. Days Remaining</th></tr></thead><tbody>
         ${r.runwayList.map(x=>`<tr><td>${x.label}</td><td>${x.stock}</td><td class="${x.days<=7?'stock-low':''}">${x.days} days</td></tr>`).join('')}
       </tbody></table></div>`:'<p class="t-muted" style="font-size:13px">Not enough recent sales history yet to estimate.</p>'}
+    </div>
+
+    <div class="card"><div class="card-title">📥 Stock-In History <span class="t-muted" style="font-size:11px;font-weight:400">(latest 300 records, newest date first)</span></div>
+      ${stockLog.length?`<div class="table-wrap"><table><thead><tr><th>Date received</th><th>Item</th><th>Change</th><th>Type</th><th>Note</th></tr></thead><tbody>
+        ${stockLog.map(x=>`<tr><td style="white-space:nowrap">${fmtDay(x.stock_date)}</td><td>${x.skus?x.skus.product_name+(x.skus.variant?' ('+x.skus.variant+')':'')+' · '+x.skus.sku_code:'—'}</td><td class="${x.quantity_change<0?'stock-low':''}">${x.quantity_change>0?'+':''}${x.quantity_change}</td><td>${txnLabel(x.txn_type)}</td><td style="white-space:normal;max-width:260px">${x.notes||''}</td></tr>`).join('')}
+      </tbody></table></div>`:'<p class="t-muted" style="font-size:13px">No stock records yet.</p>'}
     </div>
 
     <p class="t-muted" style="font-size:11px;text-align:center;margin-top:8px">Hotel orders and shipping/courier reports aren't wired in yet — these reports reflect direct/storefront sales only.</p>`;

@@ -25,7 +25,15 @@ function filteredSkus(){
   });
 }
 
+/* "Last stock in" dates come from inventory_transactions (one row per item in a summary view) */
+async function loadStockIn(){
+  try{
+    const rows=await sbGet('sku_stock_in_summary','select=sku_id,last_stock_in,last_qty&limit=5000');
+    S.stockIn={};rows.forEach(r=>S.stockIn[r.sku_id]=r);
+  }catch(e){S.stockIn=S.stockIn||{};}
+}
 function renderInventory(){
+  if(!S._stockInLoaded){S._stockInLoaded=true;loadStockIn().then(()=>{if($('body')&&document.querySelector('.tab.on')&&/inventory/i.test(document.querySelector('.tab.on').getAttribute('onclick')||''))renderInventory();});}
   const list=filteredSkus();
   const lowCount=S.skus.filter(s=>s.current_stock<=s.low_stock_threshold).length;
   const sellableCount=S.skus.filter(s=>s.is_sellable).length;
@@ -67,7 +75,7 @@ function renderInventory(){
   }else{
     html+=`<div class="table-wrap"><table><thead><tr>
       <th class="frz c1">Product Name</th><th class="frz c2" style="box-shadow:2px 0 6px rgba(0,0,0,.05)">Stock</th>
-      <th>SKU</th><th>Category</th><th>Location</th><th>Unit Cost</th><th>Price (Direct)</th><th>Price (Shopee)</th>
+      <th>Last stock in</th><th>SKU</th><th>Category</th><th>Location</th><th>Unit Cost</th><th>Price (Direct)</th><th>Price (Shopee)</th>
       <th>Sellable</th><th>Supplier</th><th>Notes</th>
     </tr></thead><tbody>`;
     list.forEach(s=>{
@@ -75,6 +83,7 @@ function renderInventory(){
       html+=`<tr>
         <td class="frz c1"><strong>${s.product_name}</strong>${isDupSku(s)?' <span class="pill-tiny" style="background:var(--warn-bg,#FFF0CC);color:var(--warn,#92600A)">Duplicate?</span>':''}${s.variant?`<br><span class="t-muted" style="font-size:11px">${s.variant}</span>`:''}<br><button type="button" onclick="deleteSku('${s.id}')" style="background:none;border:none;padding:2px 0;font-size:11px;color:var(--danger);cursor:pointer;text-decoration:underline">🗑 Delete</button></td>
         <td class="frz c2 ${low?'stock-low':'stock-ok'}" style="box-shadow:2px 0 6px rgba(0,0,0,.05)">${s.current_stock}${low?' ⚠':''}</td>
+        <td style="white-space:nowrap">${(S.stockIn&&S.stockIn[s.id])?`${fmtDay(S.stockIn[s.id].last_stock_in)}<br><span class="t-muted" style="font-size:11px">+${S.stockIn[s.id].last_qty}</span>`:'<span class="t-muted">No record</span>'}</td>
         <td>${s.sku_code}</td>
         <td>${s.categories?s.categories.name:'<span class="t-muted">Unassigned</span>'}</td>
         <td><span class="pill-tiny ${s.location==='studio'?'pill-studio':'pill-warehouse'}">${s.location}</span></td>
@@ -244,6 +253,7 @@ async function submitAdjustment(){
     });
     toast('✓ Adjustment recorded!');
     closeModal('adj-modal');
+    S._stockInLoaded=false;
     await initInventoryData();
   }catch(e){toast('Error: '+e.message);}
 }
@@ -324,7 +334,7 @@ async function deleteSku(id){
     if(sales.length||orders.length){await hideSkuInstead(s,'This item already has sales or orders, so it cannot be deleted without breaking your records.');return;}
     if(asRaw.length){await hideSkuInstead(s,'This item is used as a raw material in another product\'s recipe, so it cannot be deleted.');return;}
 
-    const clearable={variant_photos:'sku_id',product_recipes:'finished_sku_id',mcc_likes:'sku_id'};
+    const clearable={variant_photos:'sku_id',product_recipes:'finished_sku_id',mcc_likes:'sku_id',inventory_transactions:'sku_id'};
     let done=false;
     for(let attempt=0;attempt<5&&!done;attempt++){
       try{

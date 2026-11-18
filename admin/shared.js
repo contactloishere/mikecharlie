@@ -183,10 +183,18 @@ const S={skus:[],categories:[],search:'',catFilter:'',locFilter:'',lowOnly:false
 const PS={listings:[],allSkus:[],categories:[],photoMap:{},recipesAll:[],groups:[],currentTitle:null,currentListing:null,variants:[],expandedId:null,newVariantCounter:0};
 function attrEsc(s){return (s==null?'':String(s)).replace(/"/g,'&quot;');}
 
+/* Stock-in dates are plain calendar days (no time), kept in Philippine time */
+function todayPH(){return new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Manila'});}   // 2026-11-18
+function fmtDay(d){
+  if(!d)return '—';
+  const [y,m,day]=String(d).slice(0,10).split('-').map(Number);
+  return new Date(y,m-1,day).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'});
+}
+
 function goTab(name,btn){
   document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
   if(btn)btn.classList.add('on');
-  if(name==='inventory')renderInventory();
+  if(name==='inventory'){S._stockInLoaded=false;renderInventory();}
   if(name==='takeorder')renderTakeOrder();
   if(name==='home')renderHome();
   if(name==='sales')renderSalesLog();
