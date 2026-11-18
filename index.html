@@ -92,6 +92,8 @@ a{color:inherit}
 .pcard-add:disabled{background:var(--sand);color:var(--text-muted)}
 
 .pcard.sold{opacity:.55;filter:grayscale(1)}
+.detail-gallery.sold .detail-scroll{opacity:.55;filter:grayscale(1)}
+.detail-btns .btn:disabled{opacity:.55;filter:grayscale(1);cursor:not-allowed}
 .psold{position:absolute;top:8px;right:8px;background:var(--text-dark);color:white;font-size:11px;font-weight:700;letter-spacing:.08em;padding:3px 10px;border-radius:20px;z-index:2}
 
 /* PRELOVED SALE SECTION */
@@ -344,6 +346,22 @@ function axis2Options(group,axis1){
 function findByAxes(group,axis1,axis2){
   return group.find(v=>v.variant_axis_1===axis1 && v.variant_axis_2===axis2);
 }
+/* Out-of-stock choices in the dropdowns: kept visible, but grayed and labelled */
+const OOS_TXT=' (Out of stock)';
+const OOS_STYLE='color:#9AA5A3';
+function attrEsc(t){return String(t).replace(/&/g,'&amp;').replace(/"/g,'&quot;');}
+function variantOptHtml(v,i,selected){
+  const out=v.current_stock<=0;
+  return `<option value="${i}" ${selected?'selected':''} ${out?`style="${OOS_STYLE}"`:''}>${v.variant||v.sku_code}${out?OOS_TXT:''}</option>`;
+}
+function axis1OptHtml(group,a,selected){
+  const out=group.filter(v=>v.variant_axis_1===a).every(v=>v.current_stock<=0);
+  return `<option value="${attrEsc(a)}" ${selected?'selected':''} ${out?`style="${OOS_STYLE}"`:''}>${a}${out?OOS_TXT:''}</option>`;
+}
+function axis2OptHtml(group,axis1,a,selected){
+  const v=findByAxes(group,axis1,a),out=v&&v.current_stock<=0;
+  return `<option value="${attrEsc(a)}" ${selected?'selected':''} ${out?`style="${OOS_STYLE}"`:''}>${a}${out?OOS_TXT:''}</option>`;
+}
 
 /* ─── PRICING/IMAGES HELPERS ─── */
 function effectivePrice(sku){return (sku.is_on_sale && sku.sale_price!=null) ? sku.sale_price : sku.retail_price_direct;}
@@ -450,7 +468,7 @@ function productCardHtml(group,gi){
     const a1opts=axis1Options(group);
     variantControlHtml=`<select class="pcard-variant" onclick="event.stopPropagation()" onchange="cardAxis1Change(${gi},this.value)" id="card-axis1-${gi}">
         <option value="" disabled selected>Select Color</option>
-        ${a1opts.map(a=>`<option>${a}</option>`).join('')}
+        ${a1opts.map(a=>axis1OptHtml(group,a,false)).join('')}
       </select>
       <select class="pcard-variant" onclick="event.stopPropagation()" onchange="cardAxis2Change(${gi},this.value)" id="card-axis2-${gi}" disabled>
         <option value="" disabled selected>Select Variant</option>
@@ -458,10 +476,10 @@ function productCardHtml(group,gi){
   }else if(group.length>1){
     variantControlHtml=`<select class="pcard-variant" onclick="event.stopPropagation()" onchange="cardVariantChange(${gi},+this.value)">
         <option value="" disabled selected>Select Variant</option>
-        ${group.map((v,i)=>`<option value="${i}">${v.variant||v.sku_code}</option>`).join('')}
+        ${group.map((v,i)=>variantOptHtml(v,i,false)).join('')}
       </select>`;
   }
-  return `<div class="pcard ${pre&&out?'sold':''}" id="pcard-${gi}">
+  return `<div class="pcard ${groupSold(group)?'sold':''}" id="pcard-${gi}">
     <div class="pcard-gallery" data-gi="${gi}" onclick="openDetail(${gi})">
       <div class="pcard-scroll" id="cardscroll-${gi}">
         ${imgs.length?imgs.map(u=>`<img src="${u}" loading="lazy">`).join(''):`<div class="pcard-ph">🌿</div>`}
@@ -553,9 +571,7 @@ function updateCardForSku(gi,sku){
   addBtn.disabled=out;addBtn.textContent=out?(pre?'Sold':'Out of Stock'):'Add to Tote Bag';
   addBtn.dataset.skuId=sku.id;
   const badge=$('cardbadge-'+gi);if(badge)badge.innerHTML=stockBadgeHtml(sku);
-  if(pre){
-    const card=$('pcard-'+gi);if(card)card.classList.toggle('sold',out);
-  }
+  const card=$('pcard-'+gi);if(card)card.classList.toggle('sold',out);
 }
 function cardVariantChange(gi,variantIdx){
   const group=S.groups[gi];
@@ -567,7 +583,8 @@ function cardAxis1Change(gi,axis1){
   const group=S.groups[gi];
   const a2opts=axis2Options(group,axis1);
   const a2sel=$('card-axis2-'+gi);
-  a2sel.innerHTML='<option value="" disabled selected>Select Variant</option>'+a2opts.map(a=>`<option>${a}</option>`).join('');
+  a2sel.innerHTML='<option value="" disabled selected>Select Variant</option>'+a2opts.map(a=>axis2OptHtml(group,axis1,a,false)).join('');
+  const cardEl=$('pcard-'+gi);if(cardEl)cardEl.classList.toggle('sold',groupSold(group));
   a2sel.disabled=false;
   // Changing the color means the buyer still has to choose a variant again
   S.cardPicked[gi]=false;
@@ -706,25 +723,25 @@ function renderDetail(group,variantIdx){
     variantControlHtml=`<label class="lbl">Color</label>
       <select class="inp" id="detail-axis1" onchange="detailAxis1Change(this.value)">
         ${mustPick&&!a1?'<option value="" disabled selected>Select Color</option>':''}
-        ${a1opts.map(a=>`<option ${a===a1?'selected':''}>${a}</option>`).join('')}
+        ${a1opts.map(a=>axis1OptHtml(group,a,a===a1)).join('')}
       </select>
       <label class="lbl">Variant</label>
       <select class="inp" id="detail-axis2" onchange="detailAxis2Change(this.value)" ${a1?'':'disabled'}>
         ${mustPick?'<option value="" disabled selected>Select Variant</option>':''}
-        ${a2opts.map(a=>`<option ${(!mustPick&&a===sku.variant_axis_2)?'selected':''}>${a}</option>`).join('')}
+        ${a2opts.map(a=>axis2OptHtml(group,a1,a,(!mustPick&&a===sku.variant_axis_2))).join('')}
       </select>`;
   }else if(group.length>1){
     variantControlHtml=`<label class="lbl">Variant</label>
       <select class="inp" id="detail-variant" onchange="detailVariantChange(+this.value)">
         ${mustPick?'<option value="" disabled selected>Select Variant</option>':''}
-        ${group.map((v,i)=>`<option value="${i}" ${(!mustPick&&i===variantIdx)?'selected':''}>${v.variant||v.sku_code}</option>`).join('')}
+        ${group.map((v,i)=>variantOptHtml(v,i,(!mustPick&&i===variantIdx))).join('')}
       </select>`;
   }
 
   $('detail-view').innerHTML=`
     <button class="back-link" onclick="showGrid(true)">${pre?'← Back to Preloved Sale':'← Back to Shop'}</button>
     <div class="detail-grid">
-      <div class="detail-gallery">
+      <div class="detail-gallery ${(mustPick?groupSold(group):out)?'sold':''}">
         <div class="detail-scroll" id="detailscroll">
           ${imgs.length?imgs.map(u=>`<img src="${u}">`).join(''):`<div class="detail-ph">🌿</div>`}
         </div>
@@ -748,7 +765,7 @@ function renderDetail(group,variantIdx){
         </div>`}
         <div class="detail-btns">
           <button class="btn btn-o ${S.likes.has(sku.id)?'liked':''}" id="detail-like" onclick="toggleDetailLike('${sku.id}')">${S.likes.has(sku.id)?'❤️':'🤍'}</button>
-          <button class="btn btn-p" id="detail-add" ${(out||mustPick)?'disabled':''} onclick="detailAddToCart()">${mustPick?'Select a variant':out&&pre?'Sold':'Add to Tote Bag'}</button>
+          <button class="btn btn-p" id="detail-add" ${(out||mustPick)?'disabled':''} onclick="detailAddToCart()">${mustPick?'Select a variant':out?(pre?'Sold':'Out of Stock'):'Add to Tote Bag'}</button>
           <button class="btn btn-g" id="detail-buy" ${(out||mustPick)?'disabled':''} onclick="detailBuyNow()">Buy Now</button>
         </div>
         ${l.long_description?`<p class="detail-desc">${l.long_description}</p>`:''}

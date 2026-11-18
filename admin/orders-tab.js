@@ -5,7 +5,7 @@
    Uses helpers from shared.js: $, P, toast, sbGet, sbUpdate, fmtDate.
    ───────────────────────────────────────────────────────── */
 
-const MO={orders:[],itemsByOrder:{},filter:'all'};
+const MO={orders:[],itemsByOrder:{},filter:'all',source:'all'};
 
 const MO_STAGE_LABEL={
   awaiting_payment_verification:'Awaiting Payment',
@@ -36,11 +36,13 @@ async function renderMemberOrders(){
 function moCount(stage){return MO.orders.filter(o=>o.current_stage===stage&&!o.is_cancelled).length;}
 
 function setMoFilter(v){MO.filter=v;drawMemberOrders();}
+function setMoSource(v){MO.source=v;drawMemberOrders();}
 
 function drawMemberOrders(){
-  const list=MO.filter==='all'?MO.orders.filter(o=>!o.is_cancelled)
+  const bySource=o=>MO.source==='all'||moSource(o)===MO.source;
+  const list=(MO.filter==='all'?MO.orders.filter(o=>!o.is_cancelled)
     :MO.filter==='cancelled'?MO.orders.filter(o=>o.is_cancelled)
-    :MO.orders.filter(o=>o.current_stage===MO.filter&&!o.is_cancelled);
+    :MO.orders.filter(o=>o.current_stage===MO.filter&&!o.is_cancelled)).filter(bySource);
   const cancelledCount=MO.orders.filter(o=>o.is_cancelled).length;
   $('body').innerHTML=`
     <div class="stat-strip">
@@ -55,8 +57,31 @@ function drawMemberOrders(){
         ${Object.keys(MO_STAGE_LABEL).map(k=>`<option value="${k}" ${MO.filter===k?'selected':''}>${MO_STAGE_LABEL[k]}</option>`).join('')}
         <option value="cancelled" ${MO.filter==='cancelled'?'selected':''}>Cancelled (${cancelledCount})</option>
       </select>
+      <select class="inp" onchange="setMoSource(this.value)">
+        <option value="all" ${MO.source==='all'?'selected':''}>Guests + members</option>
+        <option value="guest" ${MO.source==='guest'?'selected':''}>Guest orders only</option>
+        <option value="member" ${MO.source==='member'?'selected':''}>Member orders only</option>
+      </select>
     </div>
     ${list.length?list.map(moCard).join(''):'<div class="empty"><div class="empty-i">🧾</div><p>No orders here.</p></div>'}`;
+}
+
+/* Where did this order come from?
+   Hotel orders will get their own marker when the hotel portal is built
+   (order_source = 'hotel'); until then every storefront order is Guest or Member. */
+function moSource(o){
+  if(o.order_source==='hotel')return 'hotel';
+  return o.customer_id?'member':'guest';
+}
+function moSourceTag(o){
+  const s=moSource(o);
+  const look={
+    guest:'background:#FFF3D6;color:#8A5A00',
+    member:'background:#DDF0E6;color:#1F6B47',
+    hotel:'background:#DCE8F7;color:#24508A'
+  }[s];
+  const label={guest:'Guest order',member:'Member order',hotel:'Hotel order'}[s];
+  return `<span class="pill-tiny" style="${look};margin-left:6px;vertical-align:1px">${label}</span>`;
 }
 
 function moPill(stage,cancelled){
@@ -94,7 +119,7 @@ function moCard(o){
     <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
       <div>
         <div class="t-muted" style="font-size:12px">#${o.id.slice(0,8)} · ${fmtDate(o.created_at)}</div>
-        <div style="font-weight:600;color:var(--lagoon)">${o.customer_name}</div>
+        <div style="font-weight:600;color:var(--lagoon)">${o.customer_name}${moSourceTag(o)}</div>
       </div>
       <div style="text-align:right"><div style="font-weight:600">${P(o.total)}</div>${moPill(o.current_stage,o.is_cancelled)}</div>
     </div>
