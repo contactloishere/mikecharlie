@@ -26,12 +26,13 @@ function filteredSkus(){
 }
 
 function renderInventory(){
+  if(MV.view==="move"){renderMovement();return;}
   const list=filteredSkus();
   const lowCount=S.skus.filter(s=>s.current_stock<=s.low_stock_threshold).length;
   const sellableCount=S.skus.filter(s=>s.is_sellable).length;
   const dupCount=S.skus.filter(isDupSku).length;
 
-  let html=`
+  let html=invSubTabs()+`
   <div class="stat-strip">
     <div class="stat-box"><div class="stat-num">${S.skus.length}</div><div class="stat-lbl">Total SKUs</div></div>
     <div class="stat-box ${lowCount?'warn':''}"><div class="stat-num">${lowCount}</div><div class="stat-lbl">Low Stock</div></div>
