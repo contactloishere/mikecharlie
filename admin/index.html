@@ -261,11 +261,13 @@ tbody tr:hover td.frz{background:var(--pearl)}
       <option value="adjustment_personal_use">Personal Use (− stock)</option>
       <option value="adjustment_freebie">Freebie (− stock)</option>
       <option value="adjustment_damage">Damage (− stock)</option>
-      <option value="restock">Restock (+ stock)</option>
-      <option value="adjustment_other">Other</option>
+      <option value="restock">New stock in (+ stock)</option>
+      <option value="adjustment_other">Correction / other (type a minus for stock going out)</option>
     </select>
-    <label class="lbl">Quantity <span class="t-muted">(use a minus sign for stock going out)</span></label>
-    <input class="inp" type="number" id="adj-qty" placeholder="e.g. -1 or 5">
+    <label class="lbl">Quantity <span class="t-muted">(just type the number, the type above decides if it goes in or out)</span></label>
+    <input class="inp" type="number" id="adj-qty" placeholder="e.g. 5">
+    <label class="lbl">Date <span class="t-muted">(when it really happened)</span></label>
+    <input class="inp" type="date" id="adj-date">
     <label class="lbl">Notes</label>
     <textarea class="inp" id="adj-notes" placeholder="Optional"></textarea>
     <button class="btn btn-p btn-block" onclick="submitAdjustment()">Record Adjustment</button>
@@ -280,6 +282,8 @@ tbody tr:hover td.frz{background:var(--pearl)}
     <div class="modal-sub" id="cut-sub"></div>
     <label class="lbl">Number of Cuts</label>
     <input class="inp" type="number" id="cut-num" value="1" min="1">
+    <label class="lbl">Date <span class="t-muted">(when it was cut)</span></label>
+    <input class="inp" type="date" id="cut-date">
     <div class="card" style="background:var(--pearl);margin-bottom:12px" id="cut-preview"></div>
     <button class="btn btn-p btn-block" onclick="submitCut()">Confirm Cut</button>
   </div>

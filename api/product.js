@@ -56,7 +56,9 @@ export default async function handler(req, res) {
     const found = await sb(`product_listings?slug=eq.${encodeURIComponent(slug)}&select=*&limit=1`);
     listing = found[0];
     if (listing) {
-      skus = await sb(`skus?product_name=eq.${encodeURIComponent(listing.title)}&is_sellable=eq.true&is_active=eq.true&select=sku_code,variant,variant_axis_1,variant_axis_2,retail_price_direct,sale_price,is_on_sale,current_stock,categories(name)&order=sku_code.asc`);
+      skus = await sb(`skus?product_name=eq.${encodeURIComponent(listing.title)}&is_sellable=eq.true&is_active=eq.true&web_status=neq.hidden&select=sku_code,variant,variant_axis_1,variant_axis_2,retail_price_direct,sale_price,is_on_sale,current_stock,web_status,categories(name)&order=sku_code.asc`);
+      // "Unavailable" items have stock but are not for sale: tell search engines they are out of stock
+      skus.forEach(s => { if (s.web_status === 'unavailable') s.current_stock = 0; });
     }
   } catch (e) {
     // Could not reach the database: let the shop page handle it in the browser.

@@ -25,15 +25,7 @@ function filteredSkus(){
   });
 }
 
-/* "Last stock in" dates come from inventory_transactions (one row per item in a summary view) */
-async function loadStockIn(){
-  try{
-    const rows=await sbGet('sku_stock_in_summary','select=sku_id,last_stock_in,last_qty&limit=5000');
-    S.stockIn={};rows.forEach(r=>S.stockIn[r.sku_id]=r);
-  }catch(e){S.stockIn=S.stockIn||{};}
-}
 function renderInventory(){
-  if(!S._stockInLoaded){S._stockInLoaded=true;loadStockIn().then(()=>{if($('body')&&document.querySelector('.tab.on')&&/inventory/i.test(document.querySelector('.tab.on').getAttribute('onclick')||''))renderInventory();});}
   const list=filteredSkus();
   const lowCount=S.skus.filter(s=>s.current_stock<=s.low_stock_threshold).length;
   const sellableCount=S.skus.filter(s=>s.is_sellable).length;
@@ -75,7 +67,7 @@ function renderInventory(){
   }else{
     html+=`<div class="table-wrap"><table><thead><tr>
       <th class="frz c1">Product Name</th><th class="frz c2" style="box-shadow:2px 0 6px rgba(0,0,0,.05)">Stock</th>
-      <th>Last stock in</th><th>SKU</th><th>Category</th><th>Location</th><th>Unit Cost</th><th>Price (Direct)</th><th>Price (Shopee)</th>
+      <th>SKU</th><th>Category</th><th>Location</th><th>Unit Cost</th><th>Price (Direct)</th><th>Price (Shopee)</th>
       <th>Sellable</th><th>Supplier</th><th>Notes</th>
     </tr></thead><tbody>`;
     list.forEach(s=>{
@@ -83,7 +75,6 @@ function renderInventory(){
       html+=`<tr>
         <td class="frz c1"><strong>${s.product_name}</strong>${isDupSku(s)?' <span class="pill-tiny" style="background:var(--warn-bg,#FFF0CC);color:var(--warn,#92600A)">Duplicate?</span>':''}${s.variant?`<br><span class="t-muted" style="font-size:11px">${s.variant}</span>`:''}<br><button type="button" onclick="deleteSku('${s.id}')" style="background:none;border:none;padding:2px 0;font-size:11px;color:var(--danger);cursor:pointer;text-decoration:underline">🗑 Delete</button></td>
         <td class="frz c2 ${low?'stock-low':'stock-ok'}" style="box-shadow:2px 0 6px rgba(0,0,0,.05)">${s.current_stock}${low?' ⚠':''}</td>
-        <td style="white-space:nowrap">${(S.stockIn&&S.stockIn[s.id])?`${fmtDay(S.stockIn[s.id].last_stock_in)}<br><span class="t-muted" style="font-size:11px">+${S.stockIn[s.id].last_qty}</span>`:'<span class="t-muted">No record</span>'}</td>
         <td>${s.sku_code}</td>
         <td>${s.categories?s.categories.name:'<span class="t-muted">Unassigned</span>'}</td>
         <td><span class="pill-tiny ${s.location==='studio'?'pill-studio':'pill-warehouse'}">${s.location}</span></td>
@@ -234,26 +225,32 @@ function openAdjustmentModal(preselectSkuId){
   sel.innerHTML=S.skus.map(s=>`<option value="${s.id}">${s.sku_code} — ${s.product_name}${s.variant?' ('+s.variant+')':''} [${s.current_stock} in stock]</option>`).join('');
   if(preselectSkuId)sel.value=preselectSkuId;
   $('adj-qty').value='';$('adj-notes').value='';$('adj-type').value='adjustment_return';
+  $('adj-date').value=todayPH();$('adj-date').max=todayPH();
+  onAdjTypeChange();
   openModal('adj-modal');
 }
 function onAdjTypeChange(){
   const t=$('adj-type').value;
   const negative=['adjustment_personal_use','adjustment_freebie','adjustment_damage'].includes(t);
   const qty=$('adj-qty');
-  if(!qty.value)qty.placeholder = negative ? 'e.g. -1' : 'e.g. 1';
+  qty.placeholder = t==='adjustment_other' ? 'e.g. 5, or -2 for stock going out' : (negative ? 'e.g. 2 (this many go out)' : 'e.g. 5 (this many come in)');
 }
 async function submitAdjustment(){
   const skuId=$('adj-sku').value, type=$('adj-type').value;
-  const qty=parseInt($('adj-qty').value);
+  let qty=parseInt($('adj-qty').value);
   if(!skuId||!qty){toast('Select a product and enter a quantity.');return;}
+  const date=$('adj-date').value||todayPH();
+  if(date>todayPH()){toast('The date cannot be in the future.');return;}
+  // The type decides the direction, so typing 2 for a freebie always means 2 go out
+  if(['adjustment_personal_use','adjustment_freebie','adjustment_damage'].includes(type))qty=-Math.abs(qty);
+  else if(type!=='adjustment_other')qty=Math.abs(qty);
   try{
     await sbRpc('apply_inventory_adjustment',{
       p_sku_id:skuId, p_txn_type:type, p_quantity_change:qty,
-      p_notes:$('adj-notes').value.trim()||null, p_created_by:CURRENT_USER.id
+      p_notes:$('adj-notes').value.trim()||null, p_created_by:CURRENT_USER.id, p_stock_date:date
     });
-    toast('✓ Adjustment recorded!');
+    toast('✓ Adjustment recorded, dated '+fmtDay(date)+'!');
     closeModal('adj-modal');
-    S._stockInLoaded=false;
     await initInventoryData();
   }catch(e){toast('Error: '+e.message);}
 }
@@ -268,6 +265,7 @@ async function openCutModal(skuId){
   $('cut-num').value='1';
   updateCutPreview();
   $('cut-num').oninput=updateCutPreview;
+  $('cut-date').value=todayPH();$('cut-date').max=todayPH();
   openModal('cut-modal');
 }
 async function updateCutPreview(){
@@ -292,7 +290,9 @@ async function submitCut(){
   const num=parseInt($('cut-num').value);
   if(!num||num<1){toast('Enter a valid number of cuts.');return;}
   try{
-    await sbRpc('process_manual_cut',{p_finished_sku_id:cutTargetSku.id,p_num_cuts:num,p_created_by:CURRENT_USER.id});
+    const cutDate=$('cut-date').value||todayPH();
+    if(cutDate>todayPH()){toast('The date cannot be in the future.');return;}
+    await sbRpc('process_manual_cut',{p_finished_sku_id:cutTargetSku.id,p_num_cuts:num,p_created_by:CURRENT_USER.id,p_stock_date:cutDate});
     toast('✓ Cut complete!');
     closeModal('cut-modal');
     await initInventoryData();

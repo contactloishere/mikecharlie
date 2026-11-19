@@ -38,6 +38,31 @@ async function sbGet(table, query) {
   return r.json();
 }
 
+/* ─── ITEMS THAT CANNOT BE BOUGHT ANY MORE ───
+   An item switched to Unavailable or Hidden (or sold out) after it went into the tote bag is taken out. */
+function unavailableCartItems(skuRows) {
+  const byId = {}; skuRows.forEach(s => byId[s.id] = s);
+  return CO.cart.filter(i => {
+    const s = byId[i.sku_id];
+    return !s || s.web_status !== 'shown' || s.is_active === false || s.is_sellable === false || (s.current_stock || 0) <= 0;
+  }).map(i => {
+    const s = byId[i.sku_id];
+    return { id: i.sku_id, label: s ? (s.product_name + (s.variant ? ' (' + s.variant + ')' : '')) : (i.name || 'An item') };
+  });
+}
+function dropFromCart(bad) {
+  const ids = new Set(bad.map(b => b.id));
+  CO.cart = CO.cart.filter(i => !ids.has(i.sku_id));
+  try { localStorage.setItem('mcc_cart', JSON.stringify(CO.cart)); } catch (e) {}
+  const box = $('form-err');
+  box.textContent = 'Sorry, these items are no longer available and were taken out of your tote bag: ' + bad.map(b => b.label).join(', ') + '.';
+  box.style.display = 'block';
+  if (!CO.cart.length) {
+    $('co-items').innerHTML = '<p style="font-size:13px;color:var(--text-muted)">Your tote bag is empty. <a href="/" style="color:var(--lagoon);font-weight:600">Go back to shop</a></p>';
+    $('submit-btn').disabled = true;
+  }
+}
+
 /* ─── INIT ─── */
 async function initCheckout() {
   if (!CO.cart.length) {
@@ -60,7 +85,9 @@ async function initCheckout() {
       const photoBySku = {}; variantPhotos.forEach(p => { if (p.photo_url) photoBySku[p.sku_id] = p.photo_url; });
       skus.forEach(s => { s.listing = listingByTitle[s.product_name] || {}; s.coverPhoto = photoBySku[s.id] || s.listing.cover_image_url || null; });
       CO.skus = skus;
-      renderItems();
+      const unavailable = unavailableCartItems(skus);
+      if (unavailable.length) dropFromCart(unavailable);
+      if (CO.cart.length) renderItems();
     } catch (e) {
       $('co-items').innerHTML = '<p style="font-size:13px;color:var(--danger)">Could not load your items. Please refresh.</p>';
     }
@@ -341,6 +368,13 @@ async function submitOrder() {
   const errBox = $('form-err');
   if (err) { errBox.textContent = err; errBox.style.display = 'block'; window.scrollTo(0, 0); return; }
   errBox.style.display = 'none';
+
+  // One last look: is everything in the tote bag still for sale?
+  try {
+    const fresh = await sbGet('skus', `id=in.(${CO.cart.map(i => i.sku_id).join(',')})&select=id,product_name,variant,web_status,is_active,is_sellable,current_stock`);
+    const gone = unavailableCartItems(fresh);
+    if (gone.length) { dropFromCart(gone); if (CO.cart.length) { renderItems(); recalcTotals(); } window.scrollTo(0, 0); return; }
+  } catch (e) { /* if this check cannot run, let the order go through */ }
 
   const btn = $('submit-btn'); const orig = btn.textContent;
   btn.disabled = true; btn.textContent = 'Submitting...';

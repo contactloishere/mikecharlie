@@ -188,11 +188,19 @@ async function moRecordSale(o){
     await sbDelete('sales',`id=eq.${sale.id}`);
     throw e;
   }
-  // Deduct stock
-  for(const i of items){
-    if(!i.sku_id)continue;
-    const cur=skuById[i.sku_id];
-    if(cur) await sbUpdate('skus',i.sku_id,{current_stock:(cur.current_stock||0)-i.qty});
+  // Deduct stock the same way Take Order does: recipes are cut automatically (for example a full
+  // bar into samplers) and every step is recorded on today's date. All or nothing.
+  try{
+    await sbRpc('deduct_member_order_stock',{
+      p_sale_id:sale.id,
+      p_items:items.filter(i=>i.sku_id).map(i=>({sku_id:i.sku_id,quantity:i.qty})),
+      p_stock_date:todayPH(),
+      p_created_by:CURRENT_USER.id
+    });
+  }catch(e){
+    await sbDelete('sale_items',`sale_id=eq.${sale.id}`);
+    await sbDelete('sales',`id=eq.${sale.id}`);
+    throw e;
   }
   salesCache=null; // make Sales/Home/Reports tabs reload fresh
   return sale.id;
@@ -234,25 +242,25 @@ async function moCancel(id){
   const wasPaid=!!o.sale_id;
   const shipped=o.current_stage==='shipped';
   let msg='Cancel this order from '+o.customer_name+'?';
-  if(wasPaid)msg+='\n\nPayment was already confirmed, so the sale will be removed and the stock will be put back.';
+  if(wasPaid)msg+='\n\nPayment was already confirmed, so the sale will be removed and the items will go back to stock as a return. (If a bar was already cut into samplers, it stays cut.)';
   if(shipped)msg+='\n\nThis order is marked as shipped. Cancel it only if it is a test order.';
   if(!confirm(msg))return;
   try{
     if(wasPaid){
       const items=(MO.itemsByOrder[o.id]||[]).filter(i=>i.sku_id);
-      const ids=items.map(i=>i.sku_id);
-      const rows=ids.length?await sbGet('skus',`id=in.(${ids.join(',')})&select=id,current_stock`):[];
-      const byId={};rows.forEach(r=>byId[r.id]=r);
-      for(const i of items){
-        const cur=byId[i.sku_id];
-        if(cur){await sbUpdate('skus',i.sku_id,{current_stock:(cur.current_stock||0)+i.qty});cur.current_stock=(cur.current_stock||0)+i.qty;}
-      }
+      // Sold items come back as a "return" on the books. A bar that was already cut into samplers stays cut.
+      if(items.length) await sbRpc('return_member_order_stock',{
+        p_items:items.map(i=>({sku_id:i.sku_id,quantity:i.qty})),
+        p_notes:'Order cancelled: MO-'+o.id.slice(0,8)+' ('+o.customer_name+')',
+        p_stock_date:todayPH(),
+        p_created_by:CURRENT_USER.id
+      });
       await sbDelete('sale_items',`sale_id=eq.${o.sale_id}`);
       await sbDelete('sales',`id=eq.${o.sale_id}`);
       salesCache=null;
     }
     await sbUpdate('mcc_orders',id,{is_cancelled:true,cancelled_at:new Date().toISOString(),sale_id:null});
-    toast(wasPaid?'✓ Order cancelled, stock put back, sale removed':'✓ Order cancelled');
+    toast(wasPaid?'✓ Order cancelled, items returned to stock, sale removed':'✓ Order cancelled');
     renderMemberOrders();
   }catch(e){toast('Could not cancel: '+e.message);}
 }

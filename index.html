@@ -293,7 +293,7 @@ function saveLikes(){localStorage.setItem('mcc_likes',JSON.stringify([...S.likes
 async function init(){
   try{
     const [skus,cats,listings,variantPhotos]=await Promise.all([
-      sbGet('skus','is_sellable=eq.true&is_active=eq.true&select=*,categories(id,name)&order=product_name.asc'),
+      sbGet('skus','is_sellable=eq.true&is_active=eq.true&web_status=neq.hidden&select=*,categories(id,name)&order=product_name.asc'),
       sbGet('categories','select=*&order=display_order.asc'),
       sbGet('product_listings','select=*'),
       sbGet('variant_photos','select=sku_id,photo_url')
@@ -305,6 +305,10 @@ async function init(){
     skus.forEach(s=>{
       s.listing=listingByTitle[s.product_name]||{};
       s.variantPhotoUrl=photoBySku[s.id]||null;
+      // "Unavailable": the item has stock, but it is not for sale on the website right now.
+      // It is treated like a sold-out item (grayed out, cannot be added), with its own wording.
+      s._unavail=(s.web_status==='unavailable');
+      if(s._unavail)s.current_stock=0;
     });
     S.skus=skus;S.categories=cats;
     // If already logged in, merge in likes saved on other devices before rendering.
@@ -347,20 +351,22 @@ function findByAxes(group,axis1,axis2){
   return group.find(v=>v.variant_axis_1===axis1 && v.variant_axis_2===axis2);
 }
 /* Out-of-stock choices in the dropdowns: kept visible, but grayed and labelled */
-const OOS_TXT=' (Out of stock)';
+function oosTxt(v){return (v&&v._unavail)?' (Unavailable)':' (Out of stock)';}
+function oosWord(sku,pre){return (sku&&sku._unavail)?'Unavailable':(pre?'Sold':'Out of Stock');}
 const OOS_STYLE='color:#9AA5A3';
 function attrEsc(t){return String(t).replace(/&/g,'&amp;').replace(/"/g,'&quot;');}
 function variantOptHtml(v,i,selected){
   const out=v.current_stock<=0;
-  return `<option value="${i}" ${selected?'selected':''} ${out?`style="${OOS_STYLE}"`:''}>${v.variant||v.sku_code}${out?OOS_TXT:''}</option>`;
+  return `<option value="${i}" ${selected?'selected':''} ${out?`style="${OOS_STYLE}"`:''}>${v.variant||v.sku_code}${out?oosTxt(v):''}</option>`;
 }
 function axis1OptHtml(group,a,selected){
-  const out=group.filter(v=>v.variant_axis_1===a).every(v=>v.current_stock<=0);
-  return `<option value="${attrEsc(a)}" ${selected?'selected':''} ${out?`style="${OOS_STYLE}"`:''}>${a}${out?OOS_TXT:''}</option>`;
+  const same=group.filter(v=>v.variant_axis_1===a);
+  const out=same.every(v=>v.current_stock<=0);
+  return `<option value="${attrEsc(a)}" ${selected?'selected':''} ${out?`style="${OOS_STYLE}"`:''}>${a}${out?oosTxt({_unavail:same.every(v=>v._unavail)}):''}</option>`;
 }
 function axis2OptHtml(group,axis1,a,selected){
   const v=findByAxes(group,axis1,a),out=v&&v.current_stock<=0;
-  return `<option value="${attrEsc(a)}" ${selected?'selected':''} ${out?`style="${OOS_STYLE}"`:''}>${a}${out?OOS_TXT:''}</option>`;
+  return `<option value="${attrEsc(a)}" ${selected?'selected':''} ${out?`style="${OOS_STYLE}"`:''}>${a}${out?oosTxt(v):''}</option>`;
 }
 
 /* ─── PRICING/IMAGES HELPERS ─── */
@@ -387,7 +393,7 @@ function groupSold(g){return g.every(v=>v.current_stock<=0);}
 /* Badge on the photo: SOLD / Out of Stock / "Only N left" when fewer than 5 remain */
 function stockBadgeHtml(sku){
   const pre=isPrelovedSku(sku),n=sku.current_stock;
-  if(n<=0)return pre?`<div class="psold">SOLD</div>`:`<div class="plow" style="background:var(--text-muted)">Out of Stock</div>`;
+  if(n<=0)return sku._unavail?`<div class="plow" style="background:var(--text-muted)">Unavailable</div>`:(pre?`<div class="psold">SOLD</div>`:`<div class="plow" style="background:var(--text-muted)">Out of Stock</div>`);
   if(n<5)return `<div class="plow">Only ${n} left</div>`;
   return '';
 }
@@ -498,7 +504,7 @@ function productCardHtml(group,gi){
         <span class="pcard-price" id="cardprice-${gi}">${price!=null?P(price):'—'}</span>
         ${sku.is_on_sale&&sku.sale_price!=null?`<span class="pcard-strike" id="cardstrike-${gi}">${P(sku.retail_price_direct)}</span>`:''}
       </div>
-      <button class="pcard-add" id="cardadd-${gi}" onclick="event.stopPropagation();quickAdd(${gi})" ${(out||multi)?'disabled':''}>${multi?'Select a variant':out?(pre?'Sold':'Out of Stock'):'Add to Tote Bag'}</button>
+      <button class="pcard-add" id="cardadd-${gi}" onclick="event.stopPropagation();quickAdd(${gi})" ${(out||multi)?'disabled':''}>${multi?'Select a variant':out?oosWord(sku,pre):'Add to Tote Bag'}</button>
     </div>
   </div>`;
 }
@@ -568,7 +574,7 @@ function updateCardForSku(gi,sku){
   const addBtn=$('cardadd-'+gi);
   const out=sku.current_stock<=0;
   const pre=isPrelovedSku(sku);
-  addBtn.disabled=out;addBtn.textContent=out?(pre?'Sold':'Out of Stock'):'Add to Tote Bag';
+  addBtn.disabled=out;addBtn.textContent=out?oosWord(sku,pre):'Add to Tote Bag';
   addBtn.dataset.skuId=sku.id;
   const badge=$('cardbadge-'+gi);if(badge)badge.innerHTML=stockBadgeHtml(sku);
   const card=$('pcard-'+gi);if(card)card.classList.toggle('sold',out);
@@ -765,7 +771,7 @@ function renderDetail(group,variantIdx){
         </div>`}
         <div class="detail-btns">
           <button class="btn btn-o ${S.likes.has(sku.id)?'liked':''}" id="detail-like" onclick="toggleDetailLike('${sku.id}')">${S.likes.has(sku.id)?'❤️':'🤍'}</button>
-          <button class="btn btn-p" id="detail-add" ${(out||mustPick)?'disabled':''} onclick="detailAddToCart()">${mustPick?'Select a variant':out?(pre?'Sold':'Out of Stock'):'Add to Tote Bag'}</button>
+          <button class="btn btn-p" id="detail-add" ${(out||mustPick)?'disabled':''} onclick="detailAddToCart()">${mustPick?'Select a variant':out?oosWord(sku,pre):'Add to Tote Bag'}</button>
           <button class="btn btn-g" id="detail-buy" ${(out||mustPick)?'disabled':''} onclick="detailBuyNow()">Buy Now</button>
         </div>
         ${l.long_description?`<p class="detail-desc">${l.long_description}</p>`:''}

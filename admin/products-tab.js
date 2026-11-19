@@ -340,7 +340,7 @@ function variantAccordionHtml(v){
     <div class="variant-acc-hdr" onclick="toggleVariantAcc('${key}')">
       <div>
         <div class="variant-acc-title">${v.variant||v.sku_code||'(unsaved variant)'}${v._isNew?' <span class="t-muted">(new)</span>':''}${v.is_active===false?' <span class="t-muted">(inactive)</span>':''}</div>
-        <div class="variant-acc-sub">${v.sku_code||'no SKU yet'} · ${v.retail_price_direct!=null?P(v.retail_price_direct):'no price'} · Stock: <span class="${low?'stock-low':''}">${v.current_stock}</span></div>
+        <div class="variant-acc-sub">${v.sku_code||'no SKU yet'} · ${v.retail_price_direct!=null?P(v.retail_price_direct):'no price'} · Stock: <span class="${low?'stock-low':''}" id="vsub-stock-${key}">${v.current_stock}</span>${v.web_status==='hidden'?' · <span class="t-muted">Hidden on website</span>':v.web_status==='unavailable'?' · <span class="t-muted">Unavailable on website</span>':''}</div>
       </div>
       <span class="variant-acc-arrow ${open?'open':''}">▼</span>
     </div>
@@ -366,10 +366,7 @@ function variantFormHtml(v,key){
     <input class="inp" id="v-variant-${key}" value="${attrEsc(v.variant)}">
     <label class="lbl">SKU Code ${v._isNew?'*':''}</label>
     <input class="inp" id="v-sku-${key}" value="${attrEsc(v.sku_code)}" ${v._isNew?'':'readonly style="background:var(--pearl)"'}>
-    <label class="lbl">Current Stock</label>
-    <input class="inp" type="number" id="v-stock-${key}" value="${v.current_stock||0}">
-    <label class="lbl">Date received <span class="t-muted">(used only when you change the stock number)</span></label>
-    <input class="inp" type="date" id="v-stockdate-${key}" value="${todayPH()}" max="${todayPH()}">
+    ${stockBlockHtml(v,key)}
     <div class="field-row field-row-2">
       <div><label class="lbl">Price – Direct (₱)</label><input class="inp" type="number" step="0.01" id="v-pricedirect-${key}" value="${v.retail_price_direct!=null?v.retail_price_direct:''}"></div>
       <div><label class="lbl">Price – Shopee (₱)</label><input class="inp" type="number" step="0.01" id="v-priceshopee-${key}" value="${v.retail_price_shopee!=null?v.retail_price_shopee:''}"></div>
@@ -383,7 +380,13 @@ function variantFormHtml(v,key){
     <input class="inp" id="v-supplier-${key}" value="${attrEsc(v.supplier_source)}">
     <label class="lbl">Notes</label>
     <textarea class="inp" id="v-notes-${key}">${v.notes||''}</textarea>
-    <div class="check-row"><input type="checkbox" id="v-active-${key}" ${v.is_active!==false?'checked':''}><label for="v-active-${key}">Active</label></div>
+    <label class="lbl">On the website</label>
+    <select class="inp" id="v-web-${key}">
+      <option value="shown" ${(v.web_status||'shown')==='shown'?'selected':''}>Shown (customers can buy it)</option>
+      <option value="unavailable" ${v.web_status==='unavailable'?'selected':''}>Unavailable (customers see it grayed out, even though you have stock)</option>
+      <option value="hidden" ${v.web_status==='hidden'?'selected':''}>Hidden (customers do not see it at all)</option>
+    </select>
+    <div class="check-row"><input type="checkbox" id="v-active-${key}" ${v.is_active!==false?'checked':''}><label for="v-active-${key}">Active <span class="t-muted">(untick only to retire this item for good)</span></label></div>
 
     <div class="check-row"><input type="checkbox" id="v-hasrecipe-${key}" onchange="toggleVariantRecipe('${key}')" ${hasRecipe?'checked':''}><label for="v-hasrecipe-${key}">This variant is cut/assembled from raw materials</label></div>
     <div id="v-recipe-section-${key}" style="display:${hasRecipe?'block':'none'}">
@@ -437,7 +440,7 @@ function addNewVariant(){
     sku_code:pre?nextPrelovedSku():'',variant:'',category_id:s.category_id,location:s.location,unit_cost:s.unit_cost,
     current_stock:pre?1:0,retail_price_direct:null,retail_price_shopee:null,
     is_on_sale:false,sale_price:null,ribbon_text:s.ribbon_text,low_stock_threshold:s.low_stock_threshold,
-    supplier_source:null,notes:null,is_active:true,photo_url:'',_recipeRows:[]
+    supplier_source:null,notes:null,is_active:true,web_status:'shown',photo_url:'',_recipeRows:[]
   });
   PS.expandedId=tempId;
   renderListingDetail();
@@ -452,6 +455,93 @@ async function upsertVariantPhoto(skuId,url){
   if(!r.ok)throw new Error('Photo save failed: '+(await r.text()));
 }
 
+/* ─── STOCK: "New stock in" and "Correction" ───
+   Existing variants show their stock as a number plus two buttons. Each button saves right away, with its own
+   date, as a dated record. Saving the variant never overwrites the stock number. */
+function stockBlockHtml(v,key){
+  const today=todayPH();
+  if(v._isNew){
+    return `<label class="lbl">Starting stock</label>
+    <input class="inp" type="number" id="v-stock-${key}" value="${v.current_stock||0}">
+    <label class="lbl">Date received <span class="t-muted">(when this stock came in)</span></label>
+    <input class="inp" type="date" id="v-stockdate-${key}" value="${today}" max="${today}">`;
+  }
+  const panel='background:var(--pearl);border-radius:10px;padding:10px 12px;margin:6px 0 12px;display:none';
+  return `<label class="lbl">Current Stock</label>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:2px 0 8px">
+      <span id="v-stockshown-${key}" style="font-size:22px;font-weight:700;min-width:36px">${v.current_stock||0}</span>
+      <button class="btn btn-o btn-sm" type="button" onclick="showStockPanel('${key}','in')">+ New stock in</button>
+      <button class="btn btn-o btn-sm" type="button" onclick="showStockPanel('${key}','fix')">Correction</button>
+    </div>
+    <div id="v-stockpanel-in-${key}" style="${panel}">
+      <div class="t-muted" style="font-size:12px;margin-bottom:6px">How many new pieces arrived? They are added to your stock.</div>
+      <label class="lbl">Quantity received</label><input class="inp" type="number" min="1" id="v-in-qty-${key}" placeholder="e.g. 50">
+      <label class="lbl">Date received</label><input class="inp" type="date" id="v-in-date-${key}" value="${today}" max="${today}">
+      <label class="lbl">Note <span class="t-muted">(optional, e.g. supplier)</span></label><input class="inp" id="v-in-note-${key}">
+      <div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-p btn-sm" type="button" onclick="applyStockIn('${key}')">Add stock</button><button class="btn btn-o btn-sm" type="button" onclick="showStockPanel('${key}','')">Cancel</button></div>
+    </div>
+    <div id="v-stockpanel-fix-${key}" style="${panel}">
+      <div class="t-muted" style="font-size:12px;margin-bottom:6px">Type the number you actually counted. The difference is recorded as a correction.</div>
+      <label class="lbl">Counted number</label><input class="inp" type="number" min="0" id="v-fix-qty-${key}" placeholder="the real count">
+      <label class="lbl">Date</label><input class="inp" type="date" id="v-fix-date-${key}" value="${today}" max="${today}">
+      <label class="lbl">Reason</label>
+      <select class="inp" id="v-fix-reason-${key}"><option>Miscount</option><option>Damaged</option><option>Lost</option><option>Found extra</option><option>Other</option></select>
+      <label class="lbl">Note <span class="t-muted">(optional)</span></label><input class="inp" id="v-fix-note-${key}">
+      <div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-p btn-sm" type="button" onclick="applyStockCorrection('${key}')">Apply correction</button><button class="btn btn-o btn-sm" type="button" onclick="showStockPanel('${key}','')">Cancel</button></div>
+    </div>`;
+}
+function showStockPanel(key,which){
+  const a=$('v-stockpanel-in-'+key),b=$('v-stockpanel-fix-'+key);
+  if(a)a.style.display=which==='in'?'block':'none';
+  if(b)b.style.display=which==='fix'?'block':'none';
+}
+async function refreshVariantStock(v,key){
+  const f=await sbGet('skus',`id=eq.${v.id}&select=current_stock`);
+  if(f[0])v.current_stock=f[0].current_stock;
+  const sk=PS.allSkus.find(s=>s.id===v.id);if(sk)sk.current_stock=v.current_stock;
+  const a=$('v-stockshown-'+key);if(a)a.textContent=v.current_stock;
+  const b=$('vsub-stock-'+key);if(b)b.textContent=v.current_stock;
+}
+async function applyStockIn(key){
+  const v=PS.variants.find(x=>(x.id||x._tempId)===key);
+  if(!v||!v.id)return;
+  const qty=parseInt($('v-in-qty-'+key).value);
+  const date=$('v-in-date-'+key).value||todayPH();
+  const note=$('v-in-note-'+key).value.trim();
+  if(!(qty>0)){toast('Enter how many pieces arrived (a number above 0).');return;}
+  if(date>todayPH()){toast('The date cannot be in the future.');return;}
+  try{
+    await sbRpc('apply_inventory_adjustment',{p_sku_id:v.id,p_txn_type:'restock',p_quantity_change:qty,
+      p_notes:'New stock in'+(note?': '+note:''),p_created_by:CURRENT_USER.id,p_stock_date:date});
+    await refreshVariantStock(v,key);
+    showStockPanel(key,'');
+    $('v-in-qty-'+key).value='';$('v-in-note-'+key).value='';
+    toast('✓ Added '+qty+' to stock, dated '+fmtDay(date));
+  }catch(e){toast('Could not add stock: '+e.message);}
+}
+async function applyStockCorrection(key){
+  const v=PS.variants.find(x=>(x.id||x._tempId)===key);
+  if(!v||!v.id)return;
+  const counted=parseInt($('v-fix-qty-'+key).value);
+  const date=$('v-fix-date-'+key).value||todayPH();
+  const reason=$('v-fix-reason-'+key).value;
+  const note=$('v-fix-note-'+key).value.trim();
+  if(isNaN(counted)||counted<0){toast('Type the number you counted (0 or more).');return;}
+  if(date>todayPH()){toast('The date cannot be in the future.');return;}
+  try{
+    const f=await sbGet('skus',`id=eq.${v.id}&select=current_stock`);   // the real number right now
+    const now=f[0]?f[0].current_stock:v.current_stock;
+    const diff=counted-now;
+    if(diff===0){toast('Your count matches the current stock. Nothing to correct.');return;}
+    await sbRpc('apply_inventory_adjustment',{p_sku_id:v.id,p_txn_type:'adjustment_other',p_quantity_change:diff,
+      p_notes:`Correction (${reason}): count ${now} to ${counted}`+(note?'. '+note:''),p_created_by:CURRENT_USER.id,p_stock_date:date});
+    await refreshVariantStock(v,key);
+    showStockPanel(key,'');
+    $('v-fix-qty-'+key).value='';$('v-fix-note-'+key).value='';
+    toast('✓ Stock corrected from '+now+' to '+counted+' ('+(diff>0?'+':'')+diff+'), dated '+fmtDay(date));
+  }catch(e){toast('Could not correct stock: '+e.message);}
+}
+
 async function saveVariant(key){
   const v=PS.variants.find(x=>(x.id||x._tempId)===key);
   if(!v)return;
@@ -462,7 +552,7 @@ async function saveVariant(key){
   const onSale=$('v-onsale-'+key).checked;
   const salePrice=$('v-saleprice-'+key).value;
   if(onSale && !salePrice){toast('Enter a Sale Price, or untick On Sale.');return;}
-  const receivedOn=$('v-stockdate-'+key).value||todayPH();
+  const receivedOn=v._isNew?($('v-stockdate-'+key).value||todayPH()):todayPH();
   if(receivedOn>todayPH()){toast('Date received cannot be in the future.');return;}
   // Use what is currently shown in General, so a category you just picked is not lost
   const shared=$('ls-cat')?readGeneralFromDom().shared:(PS.sharedSettings||defaultSharedSettings());
@@ -473,7 +563,6 @@ async function saveVariant(key){
     category_id:shared.category_id,
     location:shared.location,
     unit_cost:shared.unit_cost,
-    current_stock:parseInt($('v-stock-'+key).value)||0,
     retail_price_direct:priceDirect?parseFloat(priceDirect):null,
     retail_price_shopee:priceShopee?parseFloat(priceShopee):null,
     is_on_sale:onSale,
@@ -483,8 +572,12 @@ async function saveVariant(key){
     supplier_source:$('v-supplier-'+key).value.trim()||null,
     notes:$('v-notes-'+key).value.trim()||null,
     is_active:$('v-active-'+key).checked,
+    web_status:$('v-web-'+key).value,
     is_sellable:!!(priceDirect||priceShopee)
   };
+  // Stock is never written from this form for an existing variant: use New stock in / Correction.
+  // (A brand new variant starts with the stock typed here, recorded as stock in.)
+  if(v._isNew)payload.current_stock=parseInt($('v-stock-'+key).value)||0;
   const photoUrl=$('v-photo-'+key).value.trim();
   const hasRecipe=$('v-hasrecipe-'+key).checked;
   const yieldQty=hasRecipe?(parseInt($('v-yield-'+key).value)||1):1;
@@ -494,12 +587,6 @@ async function saveVariant(key){
   })):[];
 
   try{
-    // What the stock really is right now (a sale may have happened since this page was opened)
-    let oldStock=0;
-    if(!v._isNew){
-      try{const f=await sbGet('skus',`id=eq.${v.id}&select=current_stock`);oldStock=f[0]?f[0].current_stock:0;}
-      catch(e){oldStock=v.current_stock||0;}
-    }
     let savedId;
     if(v._isNew){
       const saved=await sbInsert('skus',payload);
@@ -508,17 +595,12 @@ async function saveVariant(key){
       await sbUpdate('skus',v.id,payload);
       savedId=v.id;
     }
-    // Keep a dated record of every stock change made here (up = stock in, down = correction)
-    const stockDiff=payload.current_stock-oldStock;
-    if(stockDiff!==0){
+    // A new variant's starting stock is recorded as "New stock in" on the date chosen
+    if(v._isNew&&payload.current_stock>0){
       try{
         await sbInsert('inventory_transactions',{
-          sku_id:savedId,
-          txn_type:stockDiff>0?'restock':'adjustment_other',
-          quantity_change:stockDiff,
-          location:payload.location,
-          notes:`Products tab: stock ${oldStock} to ${payload.current_stock}`,
-          stock_date:receivedOn
+          sku_id:savedId,txn_type:'restock',quantity_change:payload.current_stock,
+          location:payload.location,notes:'New stock in: starting stock of a new product',stock_date:receivedOn
         });
       }catch(e){toast('Saved, but the stock date could not be recorded: '+e.message);}
     }

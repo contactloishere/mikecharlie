@@ -194,7 +194,7 @@ function fmtDay(d){
 function goTab(name,btn){
   document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
   if(btn)btn.classList.add('on');
-  if(name==='inventory'){S._stockInLoaded=false;renderInventory();}
+  if(name==='inventory')renderInventory();
   if(name==='takeorder')renderTakeOrder();
   if(name==='home')renderHome();
   if(name==='sales')renderSalesLog();
