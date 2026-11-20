@@ -1,4 +1,7 @@
 {
+  "redirects": [
+    { "source": "/hotel-portal", "destination": "/partner-portal", "permanent": true }
+  ],
   "rewrites": [
     { "source": "/:slug", "destination": "/api/product?slug=:slug" }
   ]

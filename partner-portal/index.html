@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Partner Portal | Mike Charlie Co.</title>
+<meta name="description" content="Log in or sign up to the Mike Charlie Co. Partner Portal for hotels and retail stores.">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --lagoon:#3E5F5C;--lagoon-dark:#2C4542;--teal:#729A94;--teal-light:#A8C5C0;
+  --golden:#D1A679;--golden-dark:#B8905F;--sand:#E6D5C3;--sand-light:#F0E8DA;
+  --pearl:#F7F3EC;--white:#FFFFFF;
+  --text-dark:#1C2E2C;--text-mid:#4A6862;--text-muted:#8FA9A4;
+  --danger:#C1121F;--danger-bg:#FFE8E8;--danger-border:#F5A0A0;
+  --success:#2D6A4F;--success-bg:#D8F3DC;--success-border:#A3D9B1;
+  --warn:#92600A;--warn-bg:#FFF0CC;
+  --shadow:0 2px 12px rgba(62,95,92,0.09);
+  --shadow-lg:0 8px 36px rgba(62,95,92,0.18);
+}
+body{font-family:'DM Sans',sans-serif;background:var(--pearl);color:var(--text-dark);min-height:100vh;font-size:15px}
+h1,h2,h3{font-family:'Cormorant Garamond',serif}
+button{font-family:'DM Sans',sans-serif;cursor:pointer}
+a{color:inherit}
+
+/* HEADER (same as the shop) */
+.hdr{position:sticky;top:0;z-index:90;background:var(--pearl);border-bottom:1px solid var(--sand);padding:1rem 1.25rem}
+.hdr-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.hdr-actions{display:flex;align-items:center;gap:10px}
+.hdr-nav-links{display:flex;gap:1.4rem;font-size:13px}
+.hamburger-btn{display:none;background:none;border:none;font-size:22px;color:var(--lagoon);cursor:pointer;padding:4px}
+@media(max-width:759px){
+  .hdr-nav-links{display:none}
+  #auth-link{display:none}
+  .hamburger-btn{display:block}
+}
+.mobile-nav-overlay{position:fixed;inset:0;background:var(--lagoon);z-index:300;display:none;flex-direction:column;align-items:center;justify-content:center;gap:1.6rem}
+.mobile-nav-overlay.show{display:flex}
+.mobile-nav-overlay a,.mobile-nav-overlay button.mnav-item{color:white;font-size:1.3rem;font-weight:600;background:none;border:none;cursor:pointer}
+.mobile-nav-close{position:absolute;top:20px;right:20px;font-size:30px;color:white;background:none;border:none;cursor:pointer;line-height:1}
+.hdr-btn{background:none;border:none;font-size:20px;color:var(--lagoon);position:relative;padding:4px}
+.cart-badge{position:absolute;top:-2px;right:-2px;background:var(--danger);color:white;font-size:10px;font-weight:700;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center}
+.auth-link{background:var(--lagoon);color:var(--pearl);border:none;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:500}
+
+/* TOTE BAG DRAWER (so the bag button in the header still works) */
+.cart-overlay{position:fixed;inset:0;background:rgba(28,46,44,.5);z-index:150;display:none}
+.cart-overlay.show{display:block}
+.cart-drawer{position:fixed;top:0;right:0;bottom:0;width:100%;max-width:420px;background:white;z-index:151;transform:translateX(100%);transition:transform .25s;display:flex;flex-direction:column;box-shadow:var(--shadow-lg)}
+.cart-drawer.show{transform:translateX(0)}
+.cart-drawer:not(.show){box-shadow:none}
+.cart-hdr{padding:1.25rem;border-bottom:1px solid var(--sand);display:flex;justify-content:space-between;align-items:center}
+.cart-hdr h2{font-size:1.3rem;color:var(--lagoon)}
+.cart-close{background:var(--sand);border:none;border-radius:50%;width:32px;height:32px;font-size:16px}
+.cart-items{flex:1;overflow-y:auto;padding:1rem 1.25rem}
+.cart-empty{text-align:center;color:var(--text-muted);padding:2rem 0;font-size:14px}
+.cart-item{display:flex;gap:10px;padding:12px 0;border-bottom:1px solid var(--sand-light)}
+.cart-item-img{width:56px;height:56px;border-radius:8px;background:var(--sand-light);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:20px;overflow:hidden}
+.cart-item-info{flex:1}
+.cart-item-name{font-size:13px;font-weight:500}
+.cart-item-var{font-size:11px;color:var(--text-muted)}
+.cart-item-row{display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:13px}
+.cart-item-price{font-weight:600;color:var(--lagoon)}
+.cart-footer{padding:1.25rem;border-top:1px solid var(--sand)}
+.cart-total-row{display:flex;justify-content:space-between;margin-bottom:12px}
+.cart-total-lbl{font-size:14px;color:var(--text-mid)}
+.cart-total-amt{font-family:'Cormorant Garamond',serif;font-size:1.4rem;color:var(--lagoon);font-weight:600}
+
+/* MEMBER LOGIN POPUP (opened by the header button) */
+.modal{position:fixed;inset:0;background:rgba(28,46,44,.65);z-index:200;display:none;align-items:center;justify-content:center;padding:1rem}
+.modal.show{display:flex}
+.modal-box{background:white;border-radius:16px;padding:2rem 1.75rem;width:100%;max-width:380px;box-shadow:var(--shadow-lg);position:relative;max-height:90vh;overflow-y:auto}
+.modal-close{position:absolute;top:12px;right:14px;background:var(--sand);border:none;border-radius:50%;width:30px;height:30px;font-size:16px;display:flex;align-items:center;justify-content:center;color:var(--text-mid)}
+.modal-box h2{font-size:1.5rem;color:var(--lagoon);text-align:center;margin-bottom:1.25rem}
+.auth-tabs{display:flex;background:var(--pearl);border-radius:9px;padding:3px;margin-bottom:1.25rem}
+.auth-tab{flex:1;padding:8px;border:none;background:none;border-radius:7px;font-size:13px;font-weight:500;color:var(--text-muted)}
+.auth-tab.on{background:white;color:var(--lagoon);box-shadow:var(--shadow)}
+.auth-err{background:var(--danger-bg);border:1px solid var(--danger-border);color:var(--danger);font-size:13px;padding:9px 12px;border-radius:8px;margin-bottom:12px;display:none}
+.auth-ok{background:var(--success-bg);border:1px solid var(--success-border);color:var(--success);text-align:center;padding:1.5rem 1rem;border-radius:9px}
+.auth-ok h3{color:var(--success);margin-bottom:6px}
+.auth-ok p{font-size:13px;color:var(--text-mid);line-height:1.5}
+
+/* FORM PIECES */
+.lbl{display:block;font-size:13px;color:var(--text-mid);margin-bottom:5px;font-weight:500}
+.inp{width:100%;padding:11px 12px;border:1.5px solid var(--sand);border-radius:9px;font-family:inherit;font-size:14px;background:white;color:var(--text-dark);margin-bottom:14px;outline:none}
+.inp:focus{border-color:var(--teal)}
+.btn{display:block;width:100%;padding:13px;border-radius:9px;font-size:14px;font-weight:500;border:none;text-align:center}
+.btn-p{background:var(--lagoon);color:var(--pearl)}
+.btn-o{background:transparent;color:var(--lagoon);border:1.5px solid var(--lagoon)}
+.btn:disabled{opacity:.6;cursor:not-allowed}
+.req{color:var(--danger);font-weight:600}
+
+/* PARTNER PORTAL PAGE */
+.wrap{max-width:460px;margin:0 auto;padding:2rem 1.25rem 4rem}
+.eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);font-weight:600;text-align:center;margin-bottom:6px}
+.wrap h1{font-size:2rem;color:var(--lagoon);text-align:center;line-height:1.15;margin-bottom:8px}
+.intro{font-size:14px;color:var(--text-mid);line-height:1.65;text-align:center;margin-bottom:1.5rem}
+.card{background:white;border:1px solid var(--sand);border-radius:14px;padding:1.4rem;box-shadow:var(--shadow);margin-bottom:1rem}
+.card h2{font-size:1.25rem;color:var(--lagoon);margin-bottom:.9rem}
+.divider{display:flex;align-items:center;gap:10px;margin:14px 0 12px;color:var(--text-muted);font-size:12px}
+.divider:before,.divider:after{content:"";flex:1;height:1px;background:var(--sand)}
+.types{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.type-card{display:flex;align-items:center;gap:8px;border:1.5px solid var(--sand);border-radius:10px;padding:11px 12px;cursor:pointer;background:white;font-size:13.5px;font-weight:500;color:var(--text-dark);user-select:none}
+.type-card input{accent-color:var(--lagoon);width:16px;height:16px;flex-shrink:0}
+.type-card.on{border-color:var(--lagoon);background:var(--pearl)}
+.hint{font-size:11.5px;color:var(--text-muted);margin:-8px 0 14px;line-height:1.5}
+.spin{width:34px;height:34px;border:3px solid var(--sand);border-top-color:var(--teal);border-radius:50%;animation:spin .8s linear infinite;margin:3rem auto 1rem}
+@keyframes spin{to{transform:rotate(360deg)}}
+.center{text-align:center}
+.muted{color:var(--text-muted)}
+.badge{display:inline-block;background:var(--pearl);border:1px solid var(--sand);color:var(--lagoon);font-size:12px;font-weight:600;padding:4px 11px;border-radius:20px;margin:0 4px 4px 0}
+.row{display:flex;justify-content:space-between;gap:12px;font-size:13.5px;padding:7px 0;border-bottom:1px solid var(--sand-light);color:var(--text-mid)}
+.row:last-child{border-bottom:none}
+.row b{color:var(--text-dark);font-weight:500;text-align:right;word-break:break-word}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--lagoon);color:white;padding:12px 20px;border-radius:9px;font-size:14px;z-index:400;box-shadow:var(--shadow-lg);display:none;max-width:92vw;text-align:center}
+</style>
+</head>
+<body>
+
+<div id="site-header"></div>
+
+<div class="wrap">
+  <div class="eyebrow">Mike Charlie Co.</div>
+  <h1>Partner Portal</h1>
+  <p class="intro">For hotels and retail stores that carry Mike Charlie Co. Order, pay and follow your orders in one place.</p>
+  <div id="portal"><div class="spin"></div></div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<div class="cart-overlay" id="cart-overlay" onclick="closeCart()"></div>
+<div class="cart-drawer" id="cart-drawer">
+  <div class="cart-hdr"><h2>Your Tote Bag</h2><button class="cart-close" onclick="closeCart()">✕</button></div>
+  <div class="cart-items" id="cart-items"></div>
+  <div class="cart-footer">
+    <div class="cart-total-row"><span class="cart-total-lbl">Total</span><span class="cart-total-amt" id="cart-total">₱0.00</span></div>
+    <button class="btn btn-p" onclick="window.location.href='/'">Go to the Shop</button>
+  </div>
+</div>
+
+<!-- Shop login popup, opened by the header button -->
+<div id="auth-modal" class="modal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeAuthModal()">✕</button>
+    <div id="auth-content"></div>
+  </div>
+</div>
+
+<script src="/partials/shared.js"></script>
+<script>
+const SB_URL='https://cdczxunygdmswgdzkbed.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkY3p4dW55Z2Rtc3dnZHprYmVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxOTg5NjksImV4cCI6MjEwMjc3NDk2OX0.IrC05NPev5Zp6uV0DMe0gZI3boQsqXuTYSTVdyn8oWg';
+loadSharedParts();
+</script>
+<script src="/partner-portal/auth.js"></script>
+</body>
+</html>

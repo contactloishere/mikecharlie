@@ -17,7 +17,7 @@ const SB_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6Ikp
 const BRAND = 'Mike Charlie Co.';
 
 // Folders and pages that exist on the site. If one of these ever lands here, we just forward it.
-const FOLDERS = ['admin', 'preloved', 'hotel-portal', 'hotel-partner-program'];
+const FOLDERS = ['admin', 'preloved', 'hotel-portal', 'partner-portal', 'hotel-partner-program'];
 const PAGES = { account: '/account.html', checkout: '/checkout.html', privacy: '/privacy.html' };
 
 const esc = (s) => String(s == null ? '' : s)
