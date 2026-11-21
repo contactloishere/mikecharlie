@@ -15,7 +15,7 @@ Supabase project: cdczxunygdmswgdzkbed. Telegram alerts via /api/notify-telegram
 ## Next stages (one commit each)
 - [x] 2. DB: server-side pricing (tiers, pooled across variants), multiple payments, invoice revisions, custom lines (admin only), assorted lines. See sql/partner-portal-stage2.sql. Tested with a rolled-back transaction.
 - [x] 3. Dashboard shell (portal.js, tabs) + partner shop page (shop-tab.js): sets on top, product cards, wholesale tiers, running total, draft order saved per login. Table mcc_partner_sets added; server handles kind "set". (Price nudge goes with the picker in stage 4.)
-- [ ] 4. Variant picker (partner-portal/picker.js defines ppShowPicker(productName)): total first, tick variants / All, even split, Assorted, instructions box
+- [x] 4. Variant picker (partner-portal/picker.js): total first, tick variants / All, even split, per-row edit with live counter, Assorted (not for products priced per variant group like Femme Cup), price nudge. Tested (20 checks, scratchpad pptest/pickertest.js).
 - [ ] 5. Checkout: saved addresses (5 max), courier (SPX/J&T, LBC choice for Palawan), shipping + packing weight
 - [ ] 6. Payment upload and invoice view
 - [ ] 7. Home / Track my Order / History tabs, Request a change button
