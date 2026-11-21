@@ -62,9 +62,17 @@ const SHIPPING_RATES = [
     tiers: [{ max: 0.5, fee: 100 }, { max: 3, fee: 125 }, { max: 5, fee: 170 }, { max: 6, fee: 445 }, { max: 7, fee: 515 }, { max: Infinity, fee: 590 }] },
 ];
 
-// Partner orders: the box and paddings add this much to the final shipping weight (kg).
+// Partner orders only: the box and paddings add weight to the final shipping weight.
 // Added automatically; partners are not shown it.
-const PARTNER_PACKING_KG = 0.7;
+//   product weight up to 3 kg  -> nothing added
+//   over 3 kg, under 5 kg      -> +0.4 kg
+//   5 kg and up                -> +0.7 kg
+function partnerPackingKg(productWeightKg) {
+  const w = Number(productWeightKg || 0);
+  if (w >= 5) return 0.7;
+  if (w > 3) return 0.4;
+  return 0;
+}
 
 /**
  * Shipping fee for a region id and total order weight (kg). Returns null only if the region is unknown.
