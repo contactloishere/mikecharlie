@@ -11,7 +11,8 @@ const TABS = [
   { id: 'order',   label: 'New Order',      fn: 'ppRenderShop' },
   { id: 'payment', label: 'Payment',        fn: 'ppRenderPayment' },
   { id: 'track',   label: 'Track my Order', fn: 'ppRenderTrack' },
-  { id: 'history', label: 'History',        fn: 'ppRenderHistory' }
+  { id: 'history', label: 'History',        fn: 'ppRenderHistory' },
+  { id: 'checkout', label: 'Checkout',      fn: 'ppRenderCheckout', hidden: true }
 ];
 
 /* ─── The order the partner is building (kept on this device, per login) ─── */
@@ -45,7 +46,7 @@ function renderPortal(p) {
       </div>
       <button class="btn btn-o" style="width:auto;padding:9px 16px" onclick="doLogout()">Log Out</button>
     </div>
-    <div class="tabs" id="pp-tabs">${TABS.map(t => `<button class="tab" id="tab-${t.id}" onclick="ppShowTab('${t.id}')">${t.label}</button>`).join('')}</div>
+    <div class="tabs" id="pp-tabs">${TABS.filter(t => !t.hidden).map(t => `<button class="tab" id="tab-${t.id}" onclick="ppShowTab('${t.id}')">${t.label}</button>`).join('')}</div>
     <div id="tab-body"></div>
     <div id="pp-bar"></div>
   </div>`;

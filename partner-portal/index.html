@@ -167,6 +167,23 @@ a{color:inherit}
 .pk-price b{color:var(--lagoon)}
 .pk-tot{font-family:'Cormorant Garamond',serif;font-size:1.6rem;color:var(--lagoon);font-weight:600}
 .pk-nudge{background:var(--warn-bg);color:var(--warn);border-radius:9px;padding:9px 12px;font-size:13px;margin-top:8px;line-height:1.5}
+
+/* CHECKOUT */
+.ck-grid{display:grid;grid-template-columns:1fr;gap:1rem}
+@media(min-width:900px){.ck-grid{grid-template-columns:1.4fr 1fr;align-items:start}}
+.ck-line{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--sand-light);font-size:13.5px}
+.ck-line:last-child{border-bottom:none}
+.ck-line .nm{flex:1;min-width:0}.ck-line .nm small{display:block;color:var(--text-muted);font-size:12px}
+.ck-q{display:flex;align-items:center;gap:4px}
+.ck-q button{width:28px;height:28px;border-radius:7px;border:1.5px solid var(--sand);background:white;color:var(--lagoon)}
+.ck-q span{min-width:26px;text-align:center}
+.ck-x{background:none;border:none;color:var(--text-muted);font-size:16px;padding:4px}
+.opt{display:flex;gap:10px;align-items:flex-start;border:1.5px solid var(--sand);border-radius:10px;padding:11px 12px;margin-bottom:8px;cursor:pointer;font-size:13.5px;background:white}
+.opt.on{border-color:var(--lagoon);background:var(--pearl)}
+.opt input{margin-top:3px;accent-color:var(--lagoon)}
+.opt small{display:block;color:var(--text-muted);font-size:12px;line-height:1.5;margin-top:2px}
+.tot{display:flex;justify-content:space-between;padding:6px 0;font-size:14px;color:var(--text-mid)}
+.tot.big{border-top:1px solid var(--sand);margin-top:6px;padding-top:12px;font-size:1.1rem;color:var(--lagoon);font-weight:600}
 </style>
 </head>
 <body>
@@ -201,6 +218,7 @@ a{color:inherit}
 </div>
 
 <script src="/partials/shared.js"></script>
+<script src="/partials/shipping-rates.js"></script>
 <script>
 const SB_URL='https://cdczxunygdmswgdzkbed.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkY3p4dW55Z2Rtc3dnZHprYmVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxOTg5NjksImV4cCI6MjEwMjc3NDk2OX0.IrC05NPev5Zp6uV0DMe0gZI3boQsqXuTYSTVdyn8oWg';
@@ -209,6 +227,7 @@ loadSharedParts();
 <script src="/partner-portal/portal.js"></script>
 <script src="/partner-portal/shop-tab.js"></script>
 <script src="/partner-portal/picker.js"></script>
+<script src="/partner-portal/checkout-tab.js"></script>
 <script src="/partner-portal/auth.js"></script>
 </body>
 </html>

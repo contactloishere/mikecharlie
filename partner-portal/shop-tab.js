@@ -13,8 +13,7 @@ async function ppRest(path) {
   return r.json();
 }
 
-async function ppRenderShop(body) {
-  try {
+async function ppLoadShop() {
     if (!SHOP.loaded) {
       const [skus, tiers, sets, listings, vp] = await Promise.all([
         ppRest('skus?is_active=eq.true&is_sellable=eq.true&select=id,product_name,variant,retail_price_direct,is_on_sale,sale_price,weight_g,web_status&order=product_name.asc,variant.asc'),
@@ -30,6 +29,11 @@ async function ppRenderShop(body) {
       skus.forEach(s => { (by[s.product_name] = by[s.product_name] || []).push(s); });
       SHOP.products = Object.keys(by).map(name => ({ name, skus: by[name] }));
     }
+}
+
+async function ppRenderShop(body) {
+  try {
+    await ppLoadShop();
   } catch (e) {
     body.innerHTML = `<div class="card center"><h2>We could not load the shop</h2>
       <p class="muted" style="font-size:13px;margin-bottom:14px">Please check your connection and try again.</p>
