@@ -75,7 +75,7 @@ returns int language sql stable security definer set search_path to 'public' as 
   from jsonb_array_elements(p_items) i
   left join public.skus s on s.id = nullif(i->>'sku_id','')::uuid
   where coalesce(s.product_name, i->>'product_name') = p_product
-    and (p_variant is null or s.variant = p_variant);
+    and (p_variant is null or s.variant ilike p_variant);
 $$;
 
 create or replace function public.mcc_partner_pay_status(p_order uuid, p_total numeric, p_paid numeric)
@@ -97,7 +97,7 @@ declare
   it jsonb; out jsonb := '[]'::jsonb;
   s public.skus%rowtype;
   k text; q int; pn text; vr text; w numeric; base numeric; unit numeric; tier numeric;
-  p_all int; p_var int; wsum numeric := 0;
+  wsum numeric := 0;
 begin
   if tg_op = 'INSERT' and not admin then
     if jsonb_typeof(new.items) <> 'array' or jsonb_array_length(new.items) = 0 then
@@ -123,11 +123,11 @@ begin
       pn := s.product_name;
       w := coalesce(s.weight_g, 0);
       base := case when s.is_on_sale and s.sale_price is not null then s.sale_price else s.retail_price_direct end;
-      p_all := public.mcc_partner_pool_qty(new.items, pn, null);
-      p_var := case when vr is null then p_all else public.mcc_partner_pool_qty(new.items, pn, vr) end;
+      -- Tier rows may carry a variant pattern (ILIKE), e.g. '%with Pouch'; pieces are pooled per pattern.
       select t.unit_price into tier from public.mcc_partner_price_tiers t
        where t.product_name = pn
-         and ((t.variant is null and t.min_qty <= p_all) or (t.variant is not null and t.variant = vr and t.min_qty <= p_var))
+         and (t.variant is null or vr ilike t.variant)
+         and public.mcc_partner_pool_qty(new.items, pn, t.variant) >= t.min_qty
        order by t.min_qty desc limit 1;
       unit := coalesce(tier, base);
       out := out || jsonb_build_object(
