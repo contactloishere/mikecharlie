@@ -14,8 +14,8 @@ Supabase project: cdczxunygdmswgdzkbed. Telegram alerts via /api/notify-telegram
 
 ## Next stages (one commit each)
 - [x] 2. DB: server-side pricing (tiers, pooled across variants), multiple payments, invoice revisions, custom lines (admin only), assorted lines. See sql/partner-portal-stage2.sql. Tested with a rolled-back transaction.
-- [ ] 3. Partner shop page (partner-portal/shop-tab.js): cards, wholesale tiers, sets on top, price nudge
-- [ ] 4. Variant picker: total first, tick variants / All, even split, Assorted, instructions box
+- [x] 3. Dashboard shell (portal.js, tabs) + partner shop page (shop-tab.js): sets on top, product cards, wholesale tiers, running total, draft order saved per login. Table mcc_partner_sets added; server handles kind "set". (Price nudge goes with the picker in stage 4.)
+- [ ] 4. Variant picker (partner-portal/picker.js defines ppShowPicker(productName)): total first, tick variants / All, even split, Assorted, instructions box
 - [ ] 5. Checkout: saved addresses (5 max), courier (SPX/J&T, LBC choice for Palawan), shipping + packing weight
 - [ ] 6. Payment upload and invoice view
 - [ ] 7. Home / Track my Order / History tabs, Request a change button
@@ -37,3 +37,12 @@ Supabase project: cdczxunygdmswgdzkbed. Telegram alerts via /api/notify-telegram
 - Admin edits: update mcc_partner_orders.items / shipping_fee (and optionally revision_note). Total change auto-bumps invoice_rev and saves a row in mcc_partner_invoices. Assigning assorted variants does not change the total.
 - Payments: partner calls mcc_partner_submit_payment(order, method, proof_url, amount); admin sets mcc_partner_payments.status to 'verified' or 'rejected'. pay_status: unpaid / proof_submitted / partial / paid.
 - Stock deduction (stage 9) must run only when pay_status = 'paid' and variants_assigned and not stock_deducted. Editing items after stock_deducted needs special handling.
+
+## Notes from stage 3
+- The branch has unrelated git history to main (shallow clone). Do NOT merge it. Shared changes are cherry-picked to main; at go-live, copy partner-portal/, sql/ and the header change onto main as one commit.
+- Current branch header links to /partner-portal; main still links to /hotel-portal (redirect to /partner-portal lives on the branch only).
+- Femme Cup: one listing, 4 variants (Regular/Large with Pouch, Regular/Large Only (No Pouch)). Tier "variant" is an ILIKE pattern.
+- Main already has: new shipping rates, partnerPackingKg, /partner-program rename, Hotel/Retail nav text. Set prices on main partial are 3100/1800/4400/2600 (branch copy of that partial is stale: do not copy it over).
+- DB functions were changed through Supabase migrations (list_migrations is the source of truth for mcc_partner_order_compute).
+- Draft order lines: {kind:'set',set_key,qty} | {kind:'product',sku_id,qty} | {kind:'assorted',product_name,qty}; saved in localStorage key mcc_partner_draft_<userId>.
+- Test script: scratchpad pptest/shoptest.js (mocked Supabase).

@@ -28,6 +28,7 @@ function ppToast(msg, ms = 3500) {
 /* ─── START: decide which screen to show ─── */
 async function initPortal() {
   ppEl('portal').innerHTML = '<div class="spin"></div>';
+  ppEl('pp-hero').style.display = ''; ppEl('pp-wrap').classList.remove('wide');
   PP.session = await getFreshSession();
   if (!PP.session) { renderLoggedOut(); return; }
   try {
@@ -228,30 +229,7 @@ async function submitPartnerSetup() {
   }
 }
 
-/* ─── SCREEN 3: THE PARTNER'S DASHBOARD ───
-   Home, New Order, Payment, Track my Order and History are built next,
-   each in its own file in this folder. */
-function renderPortal(p) {
-  if (!p.is_active) {
-    ppEl('portal').innerHTML = `<div class="card center"><h2>Your account is paused</h2>
-      <p class="muted" style="font-size:13px;line-height:1.6;margin-bottom:14px">Please message us and we will sort it out together.</p>
-      <a class="btn btn-p" href="https://wa.me/message/T7LXVS3L74A5C1" target="_blank" style="text-decoration:none">Message us on WhatsApp</a></div>`;
-    return;
-  }
-  const kinds = [p.is_hotel ? 'Hotel' : '', p.is_retail ? 'Retail' : ''].filter(Boolean);
-  ppEl('portal').innerHTML = `<div class="card">
-    <h2>Welcome, ${ppEsc(p.business_name)} 🌿</h2>
-    <div style="margin-bottom:12px">${kinds.map(k => `<span class="badge">${k} Partner</span>`).join('')}</div>
-    <div class="row"><span>Email</span><b>${ppEsc(PP.session.user.email)}</b></div>
-    ${p.contact_name ? `<div class="row"><span>Name</span><b>${ppEsc(p.contact_name)}</b></div>` : ''}
-    ${p.contact_number ? `<div class="row"><span>Contact</span><b>${ppEsc(p.contact_number)}</b></div>` : ''}
-  </div>
-  <div class="card center">
-    <h2>Your account is ready</h2>
-    <p class="muted" style="font-size:13px;line-height:1.65">Ordering, payment and order tracking are opening here very soon. Until then, message us any time and we will take your order directly.</p>
-  </div>
-  <button class="btn btn-o" onclick="doLogout()">Log Out</button>`;
-}
+/* SCREEN 3 (the dashboard with its tabs) lives in portal.js, one file per tab after that. */
 
 /* ─── GLUE ─── */
 // If someone logs in through the shop popup in the header, show their partner screen right away
