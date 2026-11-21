@@ -7,8 +7,8 @@
    ───────────────────────────────────────────────────────── */
 
 const UP={items:[],filter:'all',timer:null};
-const UP_ICON={signup:'👤',order:'🧾',rating:'⭐',partner_signup:'🤝',partner_order:'📦',partner_payment:'💳'};
-const UP_LABEL={signup:'Sign up',order:'Order',rating:'Rating',partner_signup:'Partner sign up',partner_order:'Partner order',partner_payment:'Partner payment'};
+const UP_ICON={signup:'👤',order:'🧾',rating:'⭐',partner_signup:'🤝',partner_order:'📦',partner_payment:'💳',partner_change:'✏️'};
+const UP_LABEL={signup:'Sign up',order:'Order',rating:'Rating',partner_signup:'Partner sign up',partner_order:'Partner order',partner_payment:'Partner payment',partner_change:'Partner change request'};
 const UP_TAB={order:'orders'};   // which admin tab a click should open
 
 function upAgo(iso){
@@ -67,6 +67,7 @@ function drawUpdates(){
         <option value="partner_signup" ${UP.filter==='partner_signup'?'selected':''}>Partner sign ups</option>
         <option value="partner_order" ${UP.filter==='partner_order'?'selected':''}>Partner orders</option>
         <option value="partner_payment" ${UP.filter==='partner_payment'?'selected':''}>Partner payments</option>
+        <option value="partner_change" ${UP.filter==='partner_change'?'selected':''}>Partner change requests</option>
       </select>
       <button class="btn btn-o btn-sm" onclick="markAllUpdatesRead()" ${unread?'':'disabled style="opacity:.5;cursor:default"'}>Mark all as read</button>
     </div>

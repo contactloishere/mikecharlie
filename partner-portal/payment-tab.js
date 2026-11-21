@@ -13,14 +13,19 @@ const PAY_METHODS = {
 };
 const PAY = { orders: [], payments: [], invoices: [], form: {}, files: {}, busy: {} };
 
+/* Loads this partner's orders, payments and invoice history (shared by Home, Payment, Track and History) */
+async function ppLoadPartnerData(includeCancelled) {
+  const [orders, payments, invoices] = await Promise.all([
+    ppRest('mcc_partner_orders?' + (includeCancelled ? '' : 'is_cancelled=eq.false&') + 'select=*&order=created_at.desc'),
+    ppRest('mcc_partner_payments?select=*&order=submitted_at.asc'),
+    ppRest('mcc_partner_invoices?select=*&order=rev.asc')
+  ]);
+  Object.assign(PAY, { orders: includeCancelled ? orders : orders.filter(o => !o.is_cancelled), payments, invoices });
+}
+
 async function ppRenderPayment(body) {
   try {
-    const [orders, payments, invoices] = await Promise.all([
-      ppRest('mcc_partner_orders?is_cancelled=eq.false&select=*&order=created_at.desc'),
-      ppRest('mcc_partner_payments?select=*&order=submitted_at.asc'),
-      ppRest('mcc_partner_invoices?select=*&order=rev.asc')
-    ]);
-    Object.assign(PAY, { orders, payments, invoices });
+    await ppLoadPartnerData(false);
   } catch (e) {
     body.innerHTML = `<div class="card center"><h2>We could not load your payments</h2>
       <p class="muted" style="font-size:13px;margin-bottom:14px">Please check your connection and try again.</p>

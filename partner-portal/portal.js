@@ -50,7 +50,7 @@ function renderPortal(p) {
     <div id="tab-body"></div>
     <div id="pp-bar"></div>
   </div>`;
-  ppShowTab(PP.tab || 'order');
+  ppShowTab(PP.tab || 'home');
 }
 
 function ppShowTab(id) {
