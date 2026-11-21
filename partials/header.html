@@ -2,7 +2,7 @@
   /* No underlines on any header links. Active page is bold, others are plain. */
   .hdr-nav-links a, .hdr-nav-links a:hover, .mobile-nav-overlay a, .mobile-nav-overlay a:hover { text-decoration: none !important; }
   .hdr-nav-links a { border-bottom: none !important; }
-  /* "Be Our Hotel Partner" opens a small submenu (hover on computers, tap on phones) */
+  /* "Be Our Hotel/Retail Partner" opens a small submenu (hover on computers, tap on phones) */
   .nav-dd { position: relative; display: inline-block; }
   .nav-dd-btn { background: none; border: none; padding: 0; font: inherit; cursor: pointer; color: var(--text-mid); }
   .nav-dd-btn .caret { font-size: 9px; margin-left: 4px; }
@@ -23,10 +23,10 @@
       <div class="hdr-nav-links">
         <a href="/" data-nav="shop">Shop</a>
         <div class="nav-dd" id="nav-dd">
-          <button type="button" class="nav-dd-btn" data-nav="hotel" aria-haspopup="true" onclick="toggleNavDd(event)">Be Our Hotel Partner <span class="caret">▾</span></button>
+          <button type="button" class="nav-dd-btn" data-nav="hotel" aria-haspopup="true" onclick="toggleNavDd(event)">Be Our Hotel/Retail Partner <span class="caret">▾</span></button>
           <div class="nav-dd-menu"><div class="nav-dd-menu-inner">
-            <a href="/hotel-partner-program" data-nav="hotel-partner-program">Hotel Partner Program</a>
-            <a href="/hotel-portal" data-nav="hotel-portal">Hotel Partner Log In / Sign Up</a>
+            <a href="/partner-program" data-nav="partner-program">Hotel/Retail Partner Program</a>
+            <a href="/hotel-portal" data-nav="hotel-portal">Hotel/Retail Partner Log In/Sign Up</a>
           </div></div>
         </div>
         <a href="/?category=preloved" data-nav="preloved">Preloved Sale (Decluttering Sale)</a>
@@ -44,10 +44,10 @@
   <button class="mobile-nav-close" onclick="closeMobileNav()">✕</button>
   <a href="/">Shop</a>
   <div class="mnav-group" id="mnav-hotel">
-    <button class="mnav-item" type="button" onclick="document.getElementById('mnav-hotel').classList.toggle('open')">Be Our Hotel Partner ▾</button>
+    <button class="mnav-item" type="button" onclick="document.getElementById('mnav-hotel').classList.toggle('open')">Be Our Hotel/Retail Partner ▾</button>
     <div class="mnav-sub">
-      <a href="/hotel-partner-program">Hotel Partner Program</a>
-      <a href="/hotel-portal">Hotel Partner Log In / Sign Up</a>
+      <a href="/partner-program">Hotel/Retail Partner Program</a>
+      <a href="/hotel-portal">Hotel/Retail Partner Log In/Sign Up</a>
     </div>
   </div>
   <a href="/?category=preloved">Preloved Sale (Decluttering Sale)</a>
@@ -64,12 +64,12 @@ document.addEventListener('click', function(e){ const d=document.getElementById(
   // The shop page also answers to clean product addresses like /bamboo-cup, so look for the shop grid instead of the path
   const onShopPage = !!document.getElementById('grid-view') || path === '' || path === '/';
   const isPreloved = (path === '' || path === '/') && params.get('category') === 'preloved';
-  const inHotel = path.includes('hotel-partner-program') || path.includes('hotel-portal');
+  const inHotel = path.includes('partner-program') || path.includes('hotel-portal');
   const hb = document.querySelector('.nav-dd-btn');
   if (hb) { hb.style.color = inHotel ? 'var(--lagoon)' : 'var(--text-mid)'; hb.style.fontWeight = inHotel ? '700' : '400'; }
   document.querySelectorAll('.hdr-nav-links a').forEach(a=>{
     const isShop = a.dataset.nav === 'shop' && onShopPage && !isPreloved;
-    const isHotel = (a.dataset.nav === 'hotel-partner-program' && path.includes('hotel-partner-program')) || (a.dataset.nav === 'hotel-portal' && path.includes('hotel-portal'));
+    const isHotel = (a.dataset.nav === 'partner-program' && path.includes('partner-program')) || (a.dataset.nav === 'hotel-portal' && path.includes('hotel-portal'));
     const isPrelovedLink = a.dataset.nav === 'preloved' && isPreloved;
     if (isShop || isHotel || isPrelovedLink) {
       a.style.color = 'var(--lagoon)';
@@ -83,7 +83,7 @@ document.addEventListener('click', function(e){ const d=document.getElementById(
   document.querySelectorAll('.mobile-nav-overlay a').forEach(a=>{
     const href = a.getAttribute('href') || '';
     const isShop = href === '/' && onShopPage && !isPreloved;
-    const isHotel = (href.includes('hotel-partner-program') && path.includes('hotel-partner-program')) || (href.includes('hotel-portal') && path.includes('hotel-portal'));
+    const isHotel = (href.includes('partner-program') && path.includes('partner-program')) || (href.includes('hotel-portal') && path.includes('hotel-portal'));
     const isPrelovedLink = href.includes('category=preloved') && isPreloved;
     a.style.fontWeight = (isShop || isHotel || isPrelovedLink) ? '700' : '400';
   });
