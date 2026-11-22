@@ -26,7 +26,7 @@
           <button type="button" class="nav-dd-btn" data-nav="hotel" aria-haspopup="true" onclick="toggleNavDd(event)">Be Our Hotel/Retail Partner <span class="caret">▾</span></button>
           <div class="nav-dd-menu"><div class="nav-dd-menu-inner">
             <a href="/partner-program" data-nav="partner-program">Hotel/Retail Partner Program</a>
-            <a href="/hotel-portal" data-nav="hotel-portal">Hotel/Retail Partner Log In/Sign Up</a>
+            <a href="/partner-portal" data-nav="partner-portal">Hotel/Retail Partner Log In/Sign Up</a>
           </div></div>
         </div>
         <a href="/?category=preloved" data-nav="preloved">Preloved Sale (Decluttering Sale)</a>
@@ -47,7 +47,7 @@
     <button class="mnav-item" type="button" onclick="document.getElementById('mnav-hotel').classList.toggle('open')">Be Our Hotel/Retail Partner ▾</button>
     <div class="mnav-sub">
       <a href="/partner-program">Hotel/Retail Partner Program</a>
-      <a href="/hotel-portal">Hotel/Retail Partner Log In/Sign Up</a>
+      <a href="/partner-portal">Hotel/Retail Partner Log In/Sign Up</a>
     </div>
   </div>
   <a href="/?category=preloved">Preloved Sale (Decluttering Sale)</a>
@@ -64,12 +64,12 @@ document.addEventListener('click', function(e){ const d=document.getElementById(
   // The shop page also answers to clean product addresses like /bamboo-cup, so look for the shop grid instead of the path
   const onShopPage = !!document.getElementById('grid-view') || path === '' || path === '/';
   const isPreloved = (path === '' || path === '/') && params.get('category') === 'preloved';
-  const inHotel = path.includes('partner-program') || path.includes('hotel-portal');
+  const inHotel = path.includes('partner-program') || path.includes('partner-portal');
   const hb = document.querySelector('.nav-dd-btn');
   if (hb) { hb.style.color = inHotel ? 'var(--lagoon)' : 'var(--text-mid)'; hb.style.fontWeight = inHotel ? '700' : '400'; }
   document.querySelectorAll('.hdr-nav-links a').forEach(a=>{
     const isShop = a.dataset.nav === 'shop' && onShopPage && !isPreloved;
-    const isHotel = (a.dataset.nav === 'partner-program' && path.includes('partner-program')) || (a.dataset.nav === 'hotel-portal' && path.includes('hotel-portal'));
+    const isHotel = (a.dataset.nav === 'partner-program' && path.includes('partner-program')) || (a.dataset.nav === 'partner-portal' && path.includes('partner-portal'));
     const isPrelovedLink = a.dataset.nav === 'preloved' && isPreloved;
     if (isShop || isHotel || isPrelovedLink) {
       a.style.color = 'var(--lagoon)';
@@ -83,7 +83,7 @@ document.addEventListener('click', function(e){ const d=document.getElementById(
   document.querySelectorAll('.mobile-nav-overlay a').forEach(a=>{
     const href = a.getAttribute('href') || '';
     const isShop = href === '/' && onShopPage && !isPreloved;
-    const isHotel = (href.includes('partner-program') && path.includes('partner-program')) || (href.includes('hotel-portal') && path.includes('hotel-portal'));
+    const isHotel = (href.includes('partner-program') && path.includes('partner-program')) || (href.includes('partner-portal') && path.includes('partner-portal'));
     const isPrelovedLink = href.includes('category=preloved') && isPreloved;
     a.style.fontWeight = (isShop || isHotel || isPrelovedLink) ? '700' : '400';
   });

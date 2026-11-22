@@ -248,7 +248,7 @@ function renderListingDetail(){
   $('body').innerHTML=html;
 }
 
-const RESERVED_SLUGS=['admin','account','checkout','preloved','hotel-portal','hotel-partner-program','partner-program','privacy','api','partials','sql','index','robots','sitemap','favicon'];
+const RESERVED_SLUGS=['admin','account','checkout','preloved','hotel-portal','partner-portal','hotel-partner-program','partner-program','privacy','api','partials','sql','index','robots','sitemap','favicon'];
 /* Turns anything typed into a clean web address: lowercase letters, numbers and single hyphens */
 function cleanSlug(v,keepTrailing){
   let t=String(v||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+/,'');

@@ -102,6 +102,7 @@ async function enterApp(authData, displayEmail){
   },45*60*1000);
   initInventoryData().then(()=>renderHome());
   if(typeof startUpdatesBadge==='function')startUpdatesBadge();
+  if(typeof pcStartBadge==='function')pcStartBadge();
 }
 
 async function tryRestoreSession(){
@@ -202,6 +203,7 @@ function goTab(name,btn){
   if(name==='products')renderProducts();
   if(name==='orders')renderMemberOrders();
   if(name==='updates')renderUpdates();
+  if(name==='partners')renderPartnerClients();
 }
 
 /* ─── LOAD DATA ─── */

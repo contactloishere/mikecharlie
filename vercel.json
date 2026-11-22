@@ -1,5 +1,6 @@
 {
   "redirects": [
+    { "source": "/hotel-portal", "destination": "/partner-portal", "permanent": true },
     { "source": "/hotel-partner-program", "destination": "/partner-program", "permanent": true }
   ],
   "rewrites": [
