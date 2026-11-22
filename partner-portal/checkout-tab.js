@@ -103,7 +103,7 @@ function ckRenderAddr() {
     ${CK.sel === 'new' ? `<div style="margin-top:10px">
       <label class="lbl">Address name (optional)</label><input class="inp" placeholder="e.g. Main property, Branch 2" value="${ppEsc(CK.f.label)}" oninput="CK.f.label=this.value">
       <label class="lbl">Recipient name <span class="req">*</span></label><input class="inp" value="${ppEsc(CK.f.name)}" oninput="CK.f.name=this.value">
-      <label class="lbl">Contact number <span class="req">*</span></label><input class="inp" inputmode="tel" value="${ppEsc(CK.f.phone)}" oninput="CK.f.phone=this.value">
+      <label class="lbl">Contact number <span class="req">*</span></label><input class="inp" type="tel" inputmode="numeric" maxlength="11" placeholder="09XXXXXXXXX (11 digits)" value="${ppEsc(CK.f.phone)}" oninput="this.value=this.value.replace(/\D/g,'').slice(0,11);CK.f.phone=this.value">
       <label class="lbl">Full address <span class="req">*</span></label><textarea class="inp" rows="3" placeholder="Street, barangay, city or municipality, province, postal code" oninput="CK.f.address=this.value">${ppEsc(CK.f.address)}</textarea>
       <label class="lbl">Region <span class="req">*</span></label><select class="inp" onchange="ckPickRegion(this.value)">${regionOpts}</select>
       ${full ? `<p class="hint" style="margin:0">You have 5 saved addresses, so this one is used for this order only.</p>`
@@ -144,6 +144,7 @@ async function ckPlace() {
   if (CK.sel === 'new') {
     const f = CK.f;
     if (!f.name.trim() || !f.phone.trim() || !f.address.trim() || !f.region) return ckErr('Please fill in the recipient, contact number, address and region.');
+    if (!/^\d{11}$/.test(f.phone.trim())) return ckErr('The contact number must be 11 digits, numbers only (for example 09171234567).');
     a = { label: f.label.trim() || null, recipient_name: f.name.trim(), contact_number: f.phone.trim(), address: f.address.trim(),
           region_id: f.region, region_label: (SHIPPING_RATES.find(r => r.id === f.region) || {}).label || '' };
   } else a = CK.addresses.find(x => x.id === CK.sel);

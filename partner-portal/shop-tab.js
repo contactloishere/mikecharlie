@@ -17,13 +17,17 @@ async function ppRest(path) {
 
 async function ppLoadShop() {
     if (!SHOP.loaded) {
-      const [skus, tiers, sets, listings, vp] = await Promise.all([
-        ppRest('skus?is_active=eq.true&is_sellable=eq.true&select=id,product_name,variant,retail_price_direct,is_on_sale,sale_price,weight_g,web_status&order=product_name.asc,variant.asc'),
+      const [allSkus, cats, tiers, sets, listings, vp] = await Promise.all([
+        ppRest('skus?is_active=eq.true&is_sellable=eq.true&select=id,product_name,variant,retail_price_direct,is_on_sale,sale_price,weight_g,web_status,category_id&order=product_name.asc,variant.asc'),
+        ppRest('categories?select=id,name').catch(() => []),
         ppRest('mcc_partner_price_tiers?select=product_name,variant,min_qty,unit_price&order=min_qty.asc'),
         ppRest('mcc_partner_sets?is_active=eq.true&select=*&order=sort.asc'),
         ppRest('product_listings?select=title,cover_image_url').catch(() => []),
         ppRest('variant_photos?select=sku_id,photo_url').catch(() => [])
       ]);
+      // Preloved / decluttering / garage sale items are for retail customers only, never in the partner shop
+      const hide = new Set(cats.filter(c => /preloved|declutter|garage/i.test(c.name)).map(c => c.id));
+      const skus = allSkus.filter(s => !s.category_id || !hide.has(s.category_id));
       Object.assign(SHOP, { skus, tiers, sets, loaded: true });
       SHOP.cover = {}; listings.forEach(l => { if (l.cover_image_url) SHOP.cover[l.title] = l.cover_image_url; });
       SHOP.vphoto = {}; vp.forEach(v => { if (v.photo_url) SHOP.vphoto[v.sku_id] = v.photo_url; });

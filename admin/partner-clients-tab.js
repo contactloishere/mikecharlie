@@ -12,7 +12,7 @@
 const PC={partners:[],orders:[],payments:[],tiers:[],sets:[],open:null,filter:'attention',view:'orders',edit:null,assign:null,delivery:null};
 const PC_STAGES=[
   {id:'placed',label:'Order placed'},{id:'paid',label:'Payment confirmed'},{id:'preparing',label:'Preparing'},
-  {id:'packed',label:'Packed'},{id:'shipped',label:'Shipped'},{id:'delivered',label:'Delivered'}];
+  {id:'packed',label:'Packed'},{id:'shipped',label:'Shipped Out Order'}];
 const PC_METHODS={gcash:'GCash',bdo:'BDO',gotyme:'GoTyme',maribank:'Maribank',cimb:'CIMB'};
 const pcEsc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const pc2=n=>Math.round((Number(n)||0)*100)/100;

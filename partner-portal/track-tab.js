@@ -9,14 +9,18 @@ const PSTAGES = [
   { id: 'paid',      label: 'Payment confirmed' },
   { id: 'preparing', label: 'Preparing your order' },
   { id: 'packed',    label: 'Packed' },
-  { id: 'shipped',   label: 'Shipped' },
-  { id: 'delivered', label: 'Delivered' }
+  { id: 'shipped',   label: 'Shipped Out Order' }
 ];
 
 function trkStepsHtml(o) {
-  const cur = Math.max(0, PSTAGES.findIndex(s => s.id === o.current_stage));
+  const last = PSTAGES.length - 1;
+  const stage = o.current_stage === 'delivered' ? 'shipped' : o.current_stage;
+  const cur = Math.max(0, PSTAGES.findIndex(s => s.id === stage));
   const dates = o.stage_dates || {};
-  return `<div class="steps">${PSTAGES.map((s, i) => `<div class="step ${i < cur ? 'done' : i === cur ? 'now' : ''}"><i>${i <= cur ? '✓' : ''}</i>${s.label}${dates[s.id] && i <= cur ? `<small>${payDate(dates[s.id])}</small>` : ''}</div>`).join('')}</div>`;
+  const pct = Math.round(cur / last * 100);
+  const bar = `<div class="pbar-wrap"><div class="pbar-top"><span>${cur === last ? 'On its way to you 🎉' : PSTAGES[cur].label}</span><b>${pct}%</b></div>
+    <div class="pbar"><div class="pbar-fill" style="width:${pct}%"></div></div></div>`;
+  return bar + `<div class="steps">${PSTAGES.map((s, i) => `<div class="step ${i < cur || (i === cur && cur === last) ? 'done' : i === cur ? 'now' : ''}"><i>${i <= cur ? '✓' : ''}</i>${s.label}${dates[s.id] && i <= cur ? `<small>${payDate(dates[s.id])}</small>` : ''}</div>`).join('')}</div>`;
 }
 function trkBoxHtml(o) {
   const t = o.tracking; if (!t || !(t.number || t.link)) return '';

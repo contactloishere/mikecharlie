@@ -123,8 +123,8 @@ function renderLoggedOut() {
       <input class="inp" id="pp-biz" placeholder="e.g. Sunset Cottages" autocomplete="organization">
       <label class="lbl">Your name <span class="req">*</span></label>
       <input class="inp" id="pp-name" placeholder="Full name" autocomplete="name">
-      <label class="lbl">Contact number</label>
-      <input class="inp" id="pp-phone" type="tel" inputmode="tel" placeholder="09XXXXXXXXX" autocomplete="tel">
+      <label class="lbl">Contact number <span class="req">*</span></label>
+      <input class="inp" id="pp-phone" type="tel" inputmode="numeric" maxlength="11" pattern="[0-9]{11}" placeholder="09XXXXXXXXX (11 digits)" autocomplete="tel" oninput="this.value=this.value.replace(/\D/g,'').slice(0,11)">
       ${typePickerHtml()}` : ''}
     <label class="lbl">Email <span class="req">*</span></label>
     <input class="inp" type="email" id="pp-email" placeholder="you@email.com" autocomplete="email">
@@ -148,6 +148,7 @@ async function submitPartnerSignup() {
   const types = ppReadTypes();
   if (!biz) return ppShowErr('Please enter your business name.');
   if (!name) return ppShowErr('Please enter your name.');
+  if (!/^\d{11}$/.test(phone)) return ppShowErr('Please enter your 11-digit contact number, numbers only (for example 09171234567).');
   if (!types.length) return ppShowErr('Please tick Hotel or stay, Retail store, or both.');
   if (!email) return ppShowErr('Please enter your email.');
   if (pw.length < 8) return ppShowErr('Your password needs at least 8 characters.');
@@ -225,8 +226,8 @@ function renderSetup() {
     <input class="inp" id="pp-biz" placeholder="e.g. Sunset Cottages" autocomplete="organization">
     <label class="lbl">Your name <span class="req">*</span></label>
     <input class="inp" id="pp-name" value="${ppEsc(guess)}" placeholder="Full name" autocomplete="name">
-    <label class="lbl">Contact number</label>
-    <input class="inp" id="pp-phone" type="tel" inputmode="tel" placeholder="09XXXXXXXXX" autocomplete="tel">
+    <label class="lbl">Contact number <span class="req">*</span></label>
+    <input class="inp" id="pp-phone" type="tel" inputmode="numeric" maxlength="11" pattern="[0-9]{11}" placeholder="09XXXXXXXXX (11 digits)" autocomplete="tel" oninput="this.value=this.value.replace(/\D/g,'').slice(0,11)">
     ${typePickerHtml()}
     <button class="btn btn-p" id="pp-submit" onclick="submitPartnerSetup()">Finish Setup</button>
   </div>
@@ -238,6 +239,7 @@ async function submitPartnerSetup() {
   const types = ppReadTypes();
   if (!biz) return ppShowErr('Please enter your business name.');
   if (!name) return ppShowErr('Please enter your name.');
+  if (!/^\d{11}$/.test(phone)) return ppShowErr('Please enter your 11-digit contact number, numbers only (for example 09171234567).');
   if (!types.length) return ppShowErr('Please tick Hotel or stay, Retail store, or both.');
   const btn = ppEl('pp-submit'); btn.textContent = 'Saving...'; btn.disabled = true;
   try {
