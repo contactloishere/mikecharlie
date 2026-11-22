@@ -144,7 +144,7 @@ function moCard(o){
 function moStamp(o,key){return Object.assign({},o.stage_dates||{},{[key]:new Date().toISOString()});}
 
 // Must match the platform dropdown value used for storefront sales in the Sales tab.
-const MO_SALE_PLATFORM='Website';
+const MO_SALE_PLATFORM='website'; // must match the database sale_platform values (lowercase)
 
 function moTodayLocal(){
   const d=new Date();

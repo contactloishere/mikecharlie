@@ -45,6 +45,7 @@ function pcNeeds(o){
   const n=[];
   if(PC.payments.some(p=>p.order_id===o.id&&p.status==='submitted'))n.push('Check payment');
   if(!o.variants_assigned)n.push('Choose variants');
+  if(o.pay_status==='paid'&&o.variants_assigned&&!o.stock_deducted)n.push('Record sale');
   return n;
 }
 function pcBadge(){
@@ -91,7 +92,10 @@ function pcCard(o){
 /* ─── ORDER DETAIL ─── */
 function pcDetail(o){
   const sec=(t,h)=>`<div style="border-top:1px solid var(--sand);margin-top:12px;padding-top:12px"><div style="font-weight:600;color:var(--lagoon);margin-bottom:8px">${t}</div>${h}</div>`;
-  return `<div style="margin-top:10px"><button class="btn btn-o btn-sm" onclick="pcViewAs('${o.partner_id}')">👁 View as partner</button></div>`+
+  const warn=(o.pay_status==='paid'&&o.variants_assigned&&!o.stock_deducted&&!o.is_cancelled)?`<div style="background:#FFE8E0;border:1px solid #E8B4A0;color:#8A3418;border-radius:10px;padding:10px 12px;margin-top:10px;font-size:13px">
+    <b>Sale not recorded yet.</b> ${PC.dedErr[o.id]?pcEsc(PC.dedErr[o.id])+' ':''}It shows in Sales and moves stock once it is recorded.
+    <div style="margin-top:8px"><button class="btn btn-p btn-sm" onclick="pcTryDeduct('${o.id}')">Record sale and update stock</button></div></div>`:'';
+  return warn+`<div style="margin-top:10px"><button class="btn btn-o btn-sm" onclick="pcViewAs('${o.partner_id}')">👁 View as partner</button></div>`+
     sec('Payments',pcPaymentsHtml(o))+
     sec('Items and invoice',PC.edit&&PC.edit.id===o.id?pcEditHtml(o):pcItemsHtml(o))+
     (PC.assign&&PC.assign.id===o.id?sec('Choose variants',pcAssignHtml(o)):'')+
@@ -321,6 +325,7 @@ function pcStockItems(o){
   });
   return out;
 }
+PC.dedErr={};
 async function pcTryDeduct(oid){
   const [o]=await sbGet('mcc_partner_orders',`id=eq.${oid}&select=*`);
   if(!o||o.is_cancelled||o.stock_deducted||o.pay_status!=='paid'||!o.variants_assigned)return;
@@ -331,7 +336,7 @@ async function pcTryDeduct(oid){
     const cost={};rows.forEach(r=>cost[r.id]=parseFloat(r.unit_cost)||0);
     const productCost=items.reduce((n,i)=>n+(cost[i.sku_id]||0)*i.qty,0);
     const lastPay=PC.payments.filter(p=>p.order_id===o.id&&p.status==='verified').slice(-1)[0];
-    const [sale]=await sbInsert('sales',{order_id:o.order_code,platform:MO_SALE_PLATFORM,sale_date:todayPH(),customer_name:o.business_name,
+    const [sale]=await sbInsert('sales',{order_id:o.order_code,platform:'hotel',sale_date:todayPH(),customer_name:o.business_name,
       city_province:o.region_label,address:o.address,payment_method:lastPay?PC_METHODS[lastPay.method]||lastPay.method:null,subtotal:o.subtotal,platform_fee:0,
       shipping_fee:o.shipping_fee,total_amount:o.total,net_profit:o.total-productCost-(parseFloat(o.shipping_fee)||0),source:'Partner order',notes:o.notes||null});
     try{
@@ -340,8 +345,8 @@ async function pcTryDeduct(oid){
     }catch(e){await sbDelete('sale_items',`sale_id=eq.${sale.id}`);await sbDelete('sales',`id=eq.${sale.id}`);throw e;}
     await sbUpdate('mcc_partner_orders',o.id,{stock_deducted:true,sale_id:sale.id});
     salesCache=null;await initInventoryData();await pcRefresh();
-    toast('✓ Paid and variants chosen: sale recorded and stock updated');
-  }catch(e){toast('Could not update stock: '+e.message);}
+    delete PC.dedErr[oid];toast('✓ Paid and variants chosen: sale recorded and stock updated');
+  }catch(e){PC.dedErr[oid]=e.message||String(e);drawPC();alert('The sale could not be recorded yet.\n\n'+PC.dedErr[oid]+'\n\nFix the stock in Inventory, then tap "Record sale and update stock" on the order.');}
 }
 
 /* ─── DELIVERY ─── */
