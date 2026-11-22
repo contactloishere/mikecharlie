@@ -155,13 +155,17 @@ function ppOpenPicker(name) {
   else ppToast('Choosing variants is opening very soon');
 }
 
-/* ─── The bar at the bottom: pieces and running total ─── */
+/* ─── The cart bar at the top: "(Business)'s Cart", pieces and running total ─── */
+function ppPoss(n) { n = String(n || ''); return /s$/i.test(n) ? n + "'" : n + "'s"; }
 function ppRenderBar() {
-  const bar = ppEl('pp-bar'); if (!bar) return;
-  const n = ppDraftPieces();
-  if (!n || PP.tab !== 'order' || !SHOP.loaded) { bar.innerHTML = ''; return; }
-  bar.innerHTML = `<div class="bar"><div><b>${n}</b> item${n === 1 ? '' : 's'} in your order<br><span style="font-size:12px;opacity:.85">Products total ${P(ppDraftTotal())}, shipping is added at checkout</span></div>
-    <button onclick="ppGoCheckout()">Review order</button></div>`;
+  const bar = ppEl('pp-cart'); if (!bar || !PP.partner) return;
+  const n = ppDraftPieces(), name = ppEsc(PP.partner.business_name);
+  if (PP.tab === 'checkout' && n) { bar.innerHTML = ''; return; }
+  if (!n) { bar.innerHTML = `<div class="cartbar empty"><div>🛒 <b>${ppPoss(name)} Cart</b> <span style="opacity:.85">is empty</span></div>
+    <button onclick="ppShowTab('checkout')">View cart</button></div>`; return; }
+  const total = SHOP.loaded ? `Products total ${P(ppDraftTotal())}, shipping is added at checkout` : 'Loading prices...';
+  bar.innerHTML = `<div class="cartbar"><div>🛒 <b>${ppPoss(name)} Cart</b> · <b>${n}</b> item${n === 1 ? '' : 's'}<br><span style="font-size:12px;opacity:.85">${total}</span></div>
+    <button onclick="ppGoCheckout()">Review &amp; checkout</button></div>`;
 }
 function ppGoCheckout() {
   if (typeof ppShowCheckout === 'function') ppShowCheckout();

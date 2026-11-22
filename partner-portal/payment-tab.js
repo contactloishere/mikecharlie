@@ -82,9 +82,8 @@ function payOrderCard(o) {
     <div class="row"><span>Invoice total</span><b>${P(o.total)}</b></div>
     <div class="row"><span>Confirmed payments</span><b>${P(o.amount_paid)}</b></div>
     ${pend > 0 ? `<div class="row"><span>Waiting for our check</span><b>${P(pend)}</b></div>` : ''}
-    <button class="ck-x" style="font-size:13px;color:var(--lagoon);padding:8px 0" onclick="payToggleInv('${o.id}')">View invoice ▾</button>
-    <div id="inv-${o.id}" style="display:none">${ppInvoiceHtml(o)}
-      ${earlier.length ? `<div class="hint" style="margin:10px 0 0">Earlier versions: ${earlier.map(v => `Invoice ${v.rev} was ${P(v.total)}`).join(', ')}${o.revision_note ? '. ' + ppEsc(o.revision_note) : ''}</div>` : ''}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0"><button class="btn btn-o btn-s" style="width:auto;padding:8px 14px" onclick="ppViewInvoice('${o.id}')">📄 View invoice</button><button class="btn btn-o btn-s" style="width:auto;padding:8px 14px" onclick="ppDownloadInvoice('${o.id}')">⬇ Download</button></div>
+    ${earlier.length ? `<div class="hint" style="margin:0 0 6px">Earlier versions: ${earlier.map(v => `Invoice ${v.rev} was ${P(v.total)}`).join(', ')}${o.revision_note ? '. ' + ppEsc(o.revision_note) : ''}</div>` : ''}
     ${mine.length ? `<div style="margin-top:10px">${mine.map(p => `<div class="row"><span>${payDate(p.submitted_at)} · ${PAY_METHODS[p.method] ? PAY_METHODS[p.method].label : ppEsc(p.method)}</span><b>${P(p.amount)} · ${stLabel[p.status] || p.status}</b></div>`).join('')}</div>` : ''}
     ${due > 0 ? payFormHtml(o, f, due) : `<p class="muted" style="font-size:13px;margin-top:10px">${pend > 0 ? 'Thank you, we are checking your payment.' : ''}</p>`}
   </div>`;

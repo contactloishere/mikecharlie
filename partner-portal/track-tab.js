@@ -66,8 +66,7 @@ function trkOrderCard(o) {
     </div>
     ${trkStepsHtml(o)}${trkBoxHtml(o)}
     ${!o.variants_assigned && o.pay_status === 'paid' ? '<p class="hint" style="margin:10px 0 0">We are choosing the variants for your assorted items.</p>' : ''}
-    <button class="ck-x" style="font-size:13px;color:var(--lagoon);padding:10px 0 0" onclick="payToggleInv('${o.id}')">View invoice ▾</button>
-    <div id="inv-${o.id}" style="display:none">${ppInvoiceHtml(o)}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 0"><button class="btn btn-o btn-s" style="width:auto;padding:8px 14px" onclick="ppViewInvoice('${o.id}')">📄 View invoice</button><button class="btn btn-o btn-s" style="width:auto;padding:8px 14px" onclick="ppDownloadInvoice('${o.id}')">⬇ Download</button></div>
     ${o.notes ? `<p class="hint" style="margin:8px 0 0">Your note: ${ppEsc(o.notes)}</p>` : ''}
     ${trkChangeHtml(o)}
   </div>`;

@@ -124,7 +124,7 @@ function renderLoggedOut() {
       <label class="lbl">Your name <span class="req">*</span></label>
       <input class="inp" id="pp-name" placeholder="Full name" autocomplete="name">
       <label class="lbl">Contact number <span class="req">*</span></label>
-      <input class="inp" id="pp-phone" type="tel" inputmode="numeric" maxlength="11" pattern="[0-9]{11}" placeholder="09XXXXXXXXX (11 digits)" autocomplete="tel" oninput="this.value=this.value.replace(/\D/g,'').slice(0,11)">
+      <input class="inp" id="pp-phone" type="tel" inputmode="numeric" maxlength="11" pattern="[0-9]{11}" placeholder="09XXXXXXXXX (11 digits)" autocomplete="tel" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,11)">
       ${typePickerHtml()}` : ''}
     <label class="lbl">Email <span class="req">*</span></label>
     <input class="inp" type="email" id="pp-email" placeholder="you@email.com" autocomplete="email">
@@ -227,7 +227,7 @@ function renderSetup() {
     <label class="lbl">Your name <span class="req">*</span></label>
     <input class="inp" id="pp-name" value="${ppEsc(guess)}" placeholder="Full name" autocomplete="name">
     <label class="lbl">Contact number <span class="req">*</span></label>
-    <input class="inp" id="pp-phone" type="tel" inputmode="numeric" maxlength="11" pattern="[0-9]{11}" placeholder="09XXXXXXXXX (11 digits)" autocomplete="tel" oninput="this.value=this.value.replace(/\D/g,'').slice(0,11)">
+    <input class="inp" id="pp-phone" type="tel" inputmode="numeric" maxlength="11" pattern="[0-9]{11}" placeholder="09XXXXXXXXX (11 digits)" autocomplete="tel" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,11)">
     ${typePickerHtml()}
     <button class="btn btn-p" id="pp-submit" onclick="submitPartnerSetup()">Finish Setup</button>
   </div>

@@ -17,9 +17,9 @@ async function ppRenderHistory(body) {
           <div class="set-price" style="font-size:1.35rem">${P(o.total)}</div></div>
         ${trkBoxHtml(o)}
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px">
-          <button class="ck-x" style="font-size:13px;color:var(--lagoon);padding:8px 0" onclick="payToggleInv('${o.id}')">View invoice ▾</button>
+          <button class="btn btn-o btn-s" style="width:auto;padding:8px 14px" onclick="ppViewInvoice('${o.id}')">📄 View invoice</button>
+          <button class="btn btn-o btn-s" style="width:auto;padding:8px 14px" onclick="ppDownloadInvoice('${o.id}')">⬇ Download</button>
           <button class="btn btn-o btn-s" style="width:auto;padding:8px 14px" onclick="histReorder('${o.id}')">Order again</button></div>
-        <div id="inv-${o.id}" style="display:none">${ppInvoiceHtml(o)}</div>
       </div>`; }).join('') :
       `<div class="card center"><h2>No orders yet</h2><button class="btn btn-p" style="max-width:260px;margin:12px auto 0" onclick="ppShowTab('order')">Start your first order</button></div>`);
 }

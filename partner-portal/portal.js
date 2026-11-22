@@ -61,10 +61,11 @@ function renderPortal(p) {
       ${PP.viewAs ? '<button class="btn btn-o" style="width:auto;padding:9px 16px" onclick="window.close();location.href=\'/admin\'">Back to admin</button>' : '<button class="btn btn-o" style="width:auto;padding:9px 16px" onclick="doLogout()">Log Out</button>'}
     </div>
     <div class="tabs" id="pp-tabs">${TABS.filter(t => !t.hidden).map(t => `<button class="tab" id="tab-${t.id}" onclick="ppShowTab('${t.id}')">${t.label}</button>`).join('')}</div>
+    <div id="pp-cart" class="cartbar-wrap"></div>
     <div id="tab-body"></div>
-    <div id="pp-bar"></div>
   </div>`;
   ppShowTab(PP.tab || 'home');
+  if (typeof ppLoadShop === 'function') ppLoadShop().then(() => { if (typeof ppRenderBar === 'function') ppRenderBar(); }).catch(() => {});
 }
 
 function ppShowTab(id) {
