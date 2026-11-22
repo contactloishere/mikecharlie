@@ -91,7 +91,8 @@ function pcCard(o){
 /* ─── ORDER DETAIL ─── */
 function pcDetail(o){
   const sec=(t,h)=>`<div style="border-top:1px solid var(--sand);margin-top:12px;padding-top:12px"><div style="font-weight:600;color:var(--lagoon);margin-bottom:8px">${t}</div>${h}</div>`;
-  return sec('Payments',pcPaymentsHtml(o))+
+  return `<div style="margin-top:10px"><button class="btn btn-o btn-sm" onclick="pcViewAs('${o.partner_id}')">👁 View as partner</button></div>`+
+    sec('Payments',pcPaymentsHtml(o))+
     sec('Items and invoice',PC.edit&&PC.edit.id===o.id?pcEditHtml(o):pcItemsHtml(o))+
     (PC.assign&&PC.assign.id===o.id?sec('Choose variants',pcAssignHtml(o)):'')+
     sec('Delivery',PC.delivery===o.id?pcDeliveryEditHtml(o):pcDeliveryHtml(o))+
@@ -426,7 +427,7 @@ function pcPartnersHtml(){
         <div class="t-muted" style="font-size:12px">${[p.is_hotel?'Hotel':'',p.is_retail?'Retail':''].filter(Boolean).join(' + ')} · ${pcEsc(p.contact_name||'')} ${pcEsc(p.contact_number||'')} · joined ${fmtDate(p.created_at)}</div>
         <div class="t-muted" style="font-size:12px">${os.length} order${os.length===1?'':'s'}${owed>0?' · owes '+P(owed):''}</div></div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-        <button class="btn btn-o btn-sm" onclick="PC.view='orders';PC.filter='all';PC.search='${p.id}';drawPC()" style="display:none"></button>
+        <button class="btn btn-p btn-sm" onclick="pcViewAs('${p.id}')">👁 View as partner</button>
         <button class="btn btn-o btn-sm" onclick="pcToggleActive('${p.id}')">${p.is_active?'Pause account':'Reactivate'}</button></div></div></div>`;}).join('');
 }
 async function pcToggleActive(id){
@@ -451,3 +452,6 @@ function pcStartBadge(){
   if(PC.timer)clearInterval(PC.timer);
   PC.timer=setInterval(()=>{if(!document.hidden)pcBadgeRefresh();},60000);
 }
+
+/* Opens the partner's own dashboard in a new tab, read only, using this admin login */
+function pcViewAs(id){window.open('/partner-portal?viewas='+encodeURIComponent(id),'_blank');}

@@ -16,7 +16,7 @@ const TABS = [
 ];
 
 /* ─── The order the partner is building (kept on this device, per login) ─── */
-function ppDraftKey() { return 'mcc_partner_draft_' + (PP.session ? PP.session.user.id : 'x'); }
+function ppDraftKey() { return 'mcc_partner_draft_' + (PP.session ? PP.session.user.id : 'x') + (PP.viewAs ? '_view' : ''); }
 function ppLoadDraft() {
   try { PP.draft = JSON.parse(localStorage.getItem(ppDraftKey()) || '[]'); } catch (e) { PP.draft = []; }
   if (!Array.isArray(PP.draft)) PP.draft = [];
@@ -29,7 +29,7 @@ function ppDraftPieces() { return (PP.draft || []).reduce((s, l) => s + (l.qty |
 
 /* ─── Screen 3: the dashboard ─── */
 function renderPortal(p) {
-  if (!p.is_active) {
+  if (!p.is_active && !PP.viewAs) {
     ppEl('portal').innerHTML = `<div class="wrap"><div class="card center"><h2>Your account is paused</h2>
       <p class="muted" style="font-size:13px;line-height:1.6;margin-bottom:14px">Please message us and we will sort it out together.</p>
       <a class="btn btn-p" href="https://wa.me/message/T7LXVS3L74A5C1" target="_blank" style="text-decoration:none">Message us on WhatsApp</a></div></div>`;
@@ -38,13 +38,15 @@ function renderPortal(p) {
   ppLoadDraft();
   ppEl('pp-hero').style.display = 'none'; ppEl('pp-wrap').classList.add('wide');
   const kinds = [p.is_hotel ? 'Hotel' : '', p.is_retail ? 'Retail' : ''].filter(Boolean);
-  ppEl('portal').innerHTML = `<div>
+  const viewBanner = PP.viewAs ? `<div style="background:#FFF0CC;border:1px solid #E8C97A;color:#6B4A06;border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:12px">
+      👁 Owner view of ${ppEsc(p.business_name)}${p.is_active ? '' : ' (account paused)'}. This is exactly what they see. View only: nothing here can be saved, ordered or paid.</div>` : '';
+  ppEl('portal').innerHTML = `<div>${viewBanner}
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:1rem">
       <div>
         <h1 style="text-align:left;font-size:1.7rem;margin-bottom:6px">${ppEsc(p.business_name)}</h1>
         <div>${kinds.map(k => `<span class="badge">${k} Partner</span>`).join('')}</div>
       </div>
-      <button class="btn btn-o" style="width:auto;padding:9px 16px" onclick="doLogout()">Log Out</button>
+      ${PP.viewAs ? '<button class="btn btn-o" style="width:auto;padding:9px 16px" onclick="window.close();location.href=\'/admin\'">Back to admin</button>' : '<button class="btn btn-o" style="width:auto;padding:9px 16px" onclick="doLogout()">Log Out</button>'}
     </div>
     <div class="tabs" id="pp-tabs">${TABS.filter(t => !t.hidden).map(t => `<button class="tab" id="tab-${t.id}" onclick="ppShowTab('${t.id}')">${t.label}</button>`).join('')}</div>
     <div id="tab-body"></div>

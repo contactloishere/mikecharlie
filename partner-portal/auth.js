@@ -29,6 +29,7 @@ function ppToast(msg, ms = 3500) {
 async function initPortal() {
   ppEl('portal').innerHTML = '<div class="spin"></div>';
   ppEl('pp-hero').style.display = ''; ppEl('pp-wrap').classList.remove('wide');
+  if (new URLSearchParams(location.search).get('viewas')) { await ppStartViewAs(new URLSearchParams(location.search).get('viewas')); return; }
   PP.session = await getFreshSession();
   if (!PP.session) { renderLoggedOut(); return; }
   try {
@@ -49,6 +50,37 @@ function ppHeaders(json) {
   const h = { apikey: SB_KEY, Authorization: 'Bearer ' + PP.session.access_token };
   if (json) h['Content-Type'] = 'application/json';
   return h;
+}
+
+/* ─── OWNER VIEW: "View as this partner" (opened from the admin Partner Clients tab) ───
+   Uses the admin login already saved in this browser. Read only: every save or send to the
+   database is blocked, so nothing can be changed or ordered by accident. ─── */
+async function ppStartViewAs(partnerId) {
+  const msg = (t) => { ppEl('portal').innerHTML = `<div class="card center"><h2>Owner view</h2><p class="muted" style="font-size:13px;line-height:1.6">${t}</p></div>`; };
+  let adm = null;
+  try { adm = JSON.parse(localStorage.getItem('mcc_admin_session') || 'null'); } catch (e) {}
+  if (!adm || !adm.access_token || Date.now() > adm.expires_at - 30000) {
+    msg('Please open your <a href="/admin">admin dashboard</a> first (log in there), then use the "View as partner" button again.'); return;
+  }
+  PP.viewAs = true;
+  PP.session = { access_token: adm.access_token, user: { id: partnerId } };
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/mcc_partners?id=eq.${encodeURIComponent(partnerId)}&select=*`, { headers: ppHeaders() });
+    if (!r.ok) throw new Error('x');
+    PP.partner = (await r.json())[0];
+  } catch (e) { msg('We could not load that partner. Please try again from the admin dashboard.'); return; }
+  if (!PP.partner) { msg('That partner was not found.'); return; }
+  // Block every write while viewing
+  const realFetch = window.fetch.bind(window);
+  window.fetch = (url, opts) => {
+    const m = ((opts && opts.method) || 'GET').toUpperCase();
+    if (m !== 'GET' && String(url).indexOf(SB_URL) === 0) {
+      ppToast('View only: nothing is saved in owner view.');
+      return Promise.resolve(new Response(JSON.stringify({ message: 'View only: nothing is saved in owner view.' }), { status: 403, headers: { 'Content-Type': 'application/json' } }));
+    }
+    return realFetch(url, opts);
+  };
+  renderPortal(PP.partner);
 }
 
 /* ─── SCREEN 1: SIGN UP / LOG IN ─── */

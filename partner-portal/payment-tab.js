@@ -20,7 +20,12 @@ async function ppLoadPartnerData(includeCancelled) {
     ppRest('mcc_partner_payments?select=*&order=submitted_at.asc'),
     ppRest('mcc_partner_invoices?select=*&order=rev.asc')
   ]);
-  Object.assign(PAY, { orders: includeCancelled ? orders : orders.filter(o => !o.is_cancelled), payments, invoices });
+  let pays = payments, invs = invoices;
+  if (PP.viewAs) { // owner view: keep only this partner's records
+    const ids = new Set(orders.map(o => o.id));
+    pays = payments.filter(x => ids.has(x.order_id)); invs = invoices.filter(x => ids.has(x.order_id));
+  }
+  Object.assign(PAY, { orders: includeCancelled ? orders : orders.filter(o => !o.is_cancelled), payments: pays, invoices: invs });
 }
 
 async function ppRenderPayment(body) {

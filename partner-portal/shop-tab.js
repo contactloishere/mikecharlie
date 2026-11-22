@@ -8,6 +8,8 @@
 const SHOP = { loaded: false, skus: [], tiers: [], sets: [], cover: {}, vphoto: {}, products: [] };
 
 async function ppRest(path) {
+  // Owner view: the admin login can see every partner, so narrow to the partner being viewed
+  if (PP.viewAs && /^mcc_partner_(orders|addresses)\?/.test(path)) path += '&partner_id=eq.' + encodeURIComponent(PP.partner.id);
   const r = await fetch(`${SB_URL}/rest/v1/${path}`, { headers: ppHeaders() });
   if (!r.ok) throw new Error('load failed');
   return r.json();
