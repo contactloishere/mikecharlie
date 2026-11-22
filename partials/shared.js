@@ -72,7 +72,7 @@ const SESSION_KEY = 'mcc_customer_session';
 let authMode = 'signin';
 function saveSession(data) { localStorage.setItem(SESSION_KEY, JSON.stringify({ access_token: data.access_token, refresh_token: data.refresh_token, expires_at: Date.now() + ((data.expires_in || 3600) * 1000), user: data.user })); }
 function loadSession() { try { const raw = localStorage.getItem(SESSION_KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
-function clearSession() { localStorage.removeItem(SESSION_KEY); localStorage.removeItem('mcc_display_name'); }
+function clearSession() { localStorage.removeItem(SESSION_KEY); localStorage.removeItem('mcc_display_name'); localStorage.removeItem('mcc_partner_hdr'); }
 
 /* ─── STAY LOGGED IN ───
    The login "pass" (access token) only lasts an hour, but Supabase also
@@ -203,6 +203,9 @@ function renderHeaderAuth() {
     return;
   }
   getFreshSession(); // renew quietly in the background if needed
+  const ph = partnerHdr();
+  if (ph) { applyPartnerHeader(ph); return; }
+  checkPartnerHeader();
   const first = firstNameOf(loadSession());
   if (btn) {
     btn.textContent = first ? 'Hi, ' + first + ' \u25BE' : 'My Account \u25BE';
@@ -212,6 +215,63 @@ function renderHeaderAuth() {
     mnav.innerHTML = '<a href="/account.html">My Account</a><a href="/account.html#orders">My Orders</a><button class="mnav-item" onclick="closeMobileNav();doLogout()">Log Out</button>';
   }
   if (!first) fetchDisplayName();
+}
+
+/* ─── HEADER FOR HOTEL / RETAIL PARTNERS ───
+   When the person logged in is a partner: "Hi, (business name)" with Shop / My Account / My Settings / Log Out,
+   the Shop link goes to the partner's order page, and the tote bag becomes a cart that opens their checkout. */
+function partnerHdr() {
+  try {
+    const s = loadSession(), d = JSON.parse(localStorage.getItem('mcc_partner_hdr') || 'null');
+    return (s && s.user && d && d.id === s.user.id && d.name) ? d : null;
+  } catch (e) { return null; }
+}
+// A partner who logs in on another page (or device) is recognised once per browser session
+async function checkPartnerHeader() {
+  try {
+    const s = loadSession(); if (!s || !s.user) return;
+    const k = 'mcc_partner_chk_' + s.user.id;
+    if (sessionStorage.getItem(k)) return;
+    sessionStorage.setItem(k, '1');
+    const fresh = await getFreshSession(); if (!fresh) return;
+    const rows = await fetch(`${SB_URL}/rest/v1/mcc_partners?id=eq.${fresh.user.id}&select=business_name`, { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + fresh.access_token } }).then(r => r.ok ? r.json() : []);
+    if (rows && rows[0] && rows[0].business_name) { localStorage.setItem('mcc_partner_hdr', JSON.stringify({ id: fresh.user.id, name: rows[0].business_name })); renderHeaderAuth(); }
+  } catch (e) {}
+}
+function partnerPiecesInCart() {
+  try {
+    const s = loadSession(); if (!s || !s.user) return 0;
+    const d = JSON.parse(localStorage.getItem('mcc_partner_draft_' + s.user.id) || '[]');
+    return Array.isArray(d) ? d.reduce((n, l) => n + (Number(l.qty) || 0), 0) : 0;
+  } catch (e) { return 0; }
+}
+function updatePartnerCartBadge() {
+  const b = document.getElementById('pcart-badge'); if (!b) return;
+  const n = partnerPiecesInCart(); b.textContent = n > 99 ? '99+' : n; b.style.display = n ? '' : 'none';
+}
+function openPartnerCheckout() {
+  if (typeof ppShowTab === 'function' && document.getElementById('tab-body')) ppShowTab('checkout');
+  else window.location.href = '/partner-portal#checkout';
+}
+function applyPartnerHeader(ph) {
+  document.body.classList.add('is-partner');
+  const btn = document.getElementById('auth-link');
+  if (btn) { btn.textContent = 'Hi, ' + ph.name + ' \u25BE'; btn.onclick = toggleAccountMenu; }
+  // Shop leads to the partner's order page
+  document.querySelectorAll('.hdr-nav-links a[data-nav="shop"], .mobile-nav-overlay > a[href="/"]').forEach(a => { a.setAttribute('href', '/partner-portal#order'); });
+  // tote bag becomes a cart
+  const cartBtn = document.querySelector('.hdr-actions .hdr-btn');
+  if (cartBtn && !document.getElementById('pcart-badge')) {
+    cartBtn.setAttribute('aria-label', 'Partner cart');
+    // keep the original badge element in place (the shop page updates it), just hide it and add the partner cart badge
+    const t = Array.from(cartBtn.childNodes).find(n => n.nodeType === 3);
+    if (t) t.nodeValue = '\u{1F6D2}'; else cartBtn.insertBefore(document.createTextNode('\u{1F6D2}'), cartBtn.firstChild);
+    const pb = document.createElement('span'); pb.className = 'cart-badge'; pb.id = 'pcart-badge'; pb.style.display = 'none'; pb.textContent = '0'; cartBtn.appendChild(pb);
+    cartBtn.onclick = openPartnerCheckout;
+  }
+  updatePartnerCartBadge();
+  const mnav = document.getElementById('mnav-auth');
+  if (mnav) mnav.innerHTML = '<a href="/partner-portal#order">Shop</a><a href="/partner-portal#home">My Account</a><a href="/partner-portal#settings">My Settings</a><a href="/partner-portal#checkout">Cart</a><button class="mnav-item" onclick="closeMobileNav();doLogout()">Log Out</button>';
 }
 // Email sign-ups have no name from Google, so use the name saved on their profile
 async function fetchDisplayName() {
@@ -235,12 +295,14 @@ function toggleAccountMenu(e) {
   const menu = document.createElement('div');
   menu.id = 'acct-menu';
   menu.style.cssText = 'position:fixed;top:' + (r.bottom + 6) + 'px;right:' + Math.max(12, window.innerWidth - r.right) + 'px;min-width:170px;background:#fff;border:1px solid #E6D5C3;border-radius:10px;box-shadow:0 8px 36px rgba(62,95,92,.18);padding:6px;z-index:150;font-family:\'DM Sans\',sans-serif';
-  menu.innerHTML = '<a href="/">Shop</a><a href="/account.html">My Account</a><a href="/account.html#orders">My Orders</a><button type="button" onclick="doLogout()">Log Out</button>';
+  menu.innerHTML = partnerHdr()
+    ? '<a href="/partner-portal#order">Shop</a><a href="/partner-portal#home">My Account</a><a href="/partner-portal#settings">My Settings</a><button type="button" onclick="doLogout()">Log Out</button>'
+    : '<a href="/">Shop</a><a href="/account.html">My Account</a><a href="/account.html#orders">My Orders</a><button type="button" onclick="doLogout()">Log Out</button>';
   document.body.appendChild(menu);
 }
 (function addAccountMenuStyles() {
   const st = document.createElement('style');
-  st.textContent = '#acct-menu a,#acct-menu button{display:block;width:100%;text-align:left;padding:10px 12px;border:none;background:none;border-radius:7px;font-size:14px;color:#1C2E2C;text-decoration:none;cursor:pointer;font-family:inherit}#acct-menu a:hover,#acct-menu button:hover{background:#F0E8DA}';
+  st.textContent = 'body.is-partner #cart-badge{display:none !important}#acct-menu a,#acct-menu button{display:block;width:100%;text-align:left;padding:10px 12px;border:none;background:none;border-radius:7px;font-size:14px;color:#1C2E2C;text-decoration:none;cursor:pointer;font-family:inherit}#acct-menu a:hover,#acct-menu button:hover{background:#F0E8DA}';
   document.head.appendChild(st);
 })();
 document.addEventListener('click', e => { const m = document.getElementById('acct-menu'); if (m && !m.contains(e.target)) m.remove(); });

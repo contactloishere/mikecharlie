@@ -12,8 +12,20 @@ const TABS = [
   { id: 'payment', label: 'Payment',        fn: 'ppRenderPayment' },
   { id: 'track',   label: 'Track my Order', fn: 'ppRenderTrack' },
   { id: 'history', label: 'History',        fn: 'ppRenderHistory' },
-  { id: 'checkout', label: 'Checkout',      fn: 'ppRenderCheckout', hidden: true }
+  { id: 'checkout', label: 'Checkout',      fn: 'ppRenderCheckout', hidden: true },
+  { id: 'settings', label: 'My Settings',   fn: 'ppRenderSettings', hidden: true }
 ];
+
+/* The header (shared on every page) shows "Hi, (business name)" and the cart for partners, so remember who is logged in */
+function ppRememberPartner() {
+  if (PP.viewAs || !PP.partner || !PP.session) return;
+  try { localStorage.setItem('mcc_partner_hdr', JSON.stringify({ id: PP.session.user.id, name: PP.partner.business_name })); } catch (e) {}
+  if (typeof renderHeaderAuth === 'function') renderHeaderAuth();
+}
+window.addEventListener('hashchange', () => {
+  const h = (location.hash || '').slice(1);
+  if (PP.partner && PP.tab !== h && TABS.some(t => t.id === h) && ppEl('tab-body')) ppShowTab(h);
+});
 
 /* ─── The order the partner is building (kept on this device, per login) ─── */
 function ppDraftKey() { return 'mcc_partner_draft_' + (PP.session ? PP.session.user.id : 'x') + (PP.viewAs ? '_view' : ''); }
@@ -24,6 +36,7 @@ function ppLoadDraft() {
 function ppSaveDraft() {
   try { localStorage.setItem(ppDraftKey(), JSON.stringify(PP.draft)); } catch (e) {}
   if (typeof ppRenderBar === 'function') ppRenderBar();
+  if (typeof updatePartnerCartBadge === 'function') updatePartnerCartBadge();
 }
 function ppDraftPieces() { return (PP.draft || []).reduce((s, l) => s + (l.qty || 0), 0); }
 
@@ -47,7 +60,8 @@ function renderPortal(p) {
         <button class="btn btn-o" style="width:auto;padding:10px 20px" onclick="doLogout()">Log Out</button></div></div></div>`;
     return;
   }
-  ppLoadDraft();
+  ppLoadDraft(); ppRememberPartner();
+  { const h = (location.hash || '').slice(1); if (TABS.some(t => t.id === h)) PP.tab = h; }
   ppEl('pp-hero').style.display = 'none'; ppEl('pp-wrap').classList.add('wide');
   const kinds = [p.is_hotel ? 'Hotel' : '', p.is_retail ? 'Retail' : ''].filter(Boolean);
   const viewBanner = PP.viewAs ? `<div style="background:#FFF0CC;border:1px solid #E8C97A;color:#6B4A06;border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:12px">
@@ -78,5 +92,6 @@ function ppShowTab(id) {
   else body.innerHTML = `<div class="card center"><h2>${t.label}</h2>
     <p class="muted" style="font-size:13px;line-height:1.65">This part is opening very soon. Until then, message us any time and we will take care of it directly.</p></div>`;
   if (typeof ppRenderBar === 'function') ppRenderBar();
+  if (!PP.viewAs) { try { history.replaceState(null, '', '#' + id); } catch (e) {} }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
