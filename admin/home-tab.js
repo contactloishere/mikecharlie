@@ -49,11 +49,6 @@ async function renderHome(){
       <div class="stat-box"><div class="stat-num">${inMonth.length}</div><div class="stat-lbl">Sales — This Month</div></div>
     </div>
     <div class="card">
-      <div class="card-title">🤝 Partners</div>
-      <p class="t-muted" style="font-size:13px;margin-bottom:12px">Give a vetted hotel or retail partner their own login.</p>
-      <button class="btn btn-p btn-sm" onclick="openPartnerModal()">+ Create Partner Account</button>
-    </div>
-    <div class="card">
       <div class="card-title">🔥 Top 5 Fastest-Moving — This Week</div>
       ${moverListHtml(moversWeek)}
     </div>
