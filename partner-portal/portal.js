@@ -32,14 +32,26 @@ function renderPortal(p) {
   if (!p.is_active && !PP.viewAs) {
     ppEl('portal').innerHTML = `<div class="wrap"><div class="card center"><h2>Your account is paused</h2>
       <p class="muted" style="font-size:13px;line-height:1.6;margin-bottom:14px">Please message us and we will sort it out together.</p>
-      <a class="btn btn-p" href="https://wa.me/message/T7LXVS3L74A5C1" target="_blank" style="text-decoration:none">Message us on WhatsApp</a></div></div>`;
+      <a class="btn btn-p" href="https://wa.me/message/T7LXVS3L74A5C1" target="_blank" style="text-decoration:none">Message us on WhatsApp</a>
+      <button class="btn btn-o" style="margin-top:8px" onclick="doLogout()">Log Out</button></div></div>`;
+    return;
+  }
+  if (!p.is_approved && !PP.viewAs) {
+    ppEl('pp-hero').style.display = 'none';
+    ppEl('portal').innerHTML = `<div class="wrap"><div class="card center" style="max-width:520px;margin:1.5rem auto"><div style="font-size:34px">🌿</div>
+      <h2>Thank you for signing up, ${ppEsc(p.business_name)}</h2>
+      <p class="muted" style="font-size:13.5px;line-height:1.7;margin:8px 0 16px">We check every new Hotel/Retail Partner account personally before the shop opens. We have been notified and will approve you shortly. You can come back to this page anytime, and it will open as soon as you are approved.</p>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+        <button class="btn btn-p" style="width:auto;padding:10px 20px" onclick="location.reload()">Check again</button>
+        <a class="btn btn-o" style="width:auto;padding:10px 20px;text-decoration:none" href="https://wa.me/message/T7LXVS3L74A5C1" target="_blank">Message us</a>
+        <button class="btn btn-o" style="width:auto;padding:10px 20px" onclick="doLogout()">Log Out</button></div></div></div>`;
     return;
   }
   ppLoadDraft();
   ppEl('pp-hero').style.display = 'none'; ppEl('pp-wrap').classList.add('wide');
   const kinds = [p.is_hotel ? 'Hotel' : '', p.is_retail ? 'Retail' : ''].filter(Boolean);
   const viewBanner = PP.viewAs ? `<div style="background:#FFF0CC;border:1px solid #E8C97A;color:#6B4A06;border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:12px">
-      👁 Owner view of ${ppEsc(p.business_name)}${p.is_active ? '' : ' (account paused)'}. This is exactly what they see. View only: nothing here can be saved, ordered or paid.</div>` : '';
+      👁 Owner view of ${ppEsc(p.business_name)}${p.is_active ? '' : ' (account paused)'}${p.is_approved ? '' : ' (not approved yet)'}. This is exactly what they see. View only: nothing here can be saved, ordered or paid.</div>` : '';
   ppEl('portal').innerHTML = `<div>${viewBanner}
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:1rem">
       <div>

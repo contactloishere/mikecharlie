@@ -48,7 +48,7 @@ function pcNeeds(o){
   return n;
 }
 function pcBadge(){
-  const n=PC.orders.filter(o=>pcNeeds(o).length).length, b=$('partners-badge');
+  const n=PC.orders.filter(o=>pcNeeds(o).length).length+PC.partners.filter(x=>!x.is_approved).length, b=$('partners-badge');
   if(b){b.textContent=n;b.style.display=n?'inline-block':'none';}
 }
 async function pcRefresh(keepOpen){await pcLoad();drawPC();}
@@ -70,7 +70,7 @@ function drawPC(){
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px">
       <div style="display:flex;gap:6px">
         <button class="btn ${PC.view==='orders'?'btn-p':'btn-o'} btn-sm" onclick="PC.view='orders';drawPC()">Orders</button>
-        <button class="btn ${PC.view==='partners'?'btn-p':'btn-o'} btn-sm" onclick="PC.view='partners';drawPC()">Partners (${PC.partners.length})</button></div>
+        <button class="btn ${PC.view==='partners'?'btn-p':'btn-o'} btn-sm" onclick="PC.view='partners';drawPC()">Partners (${PC.partners.length})${PC.partners.some(x=>!x.is_approved)?` <span style="background:var(--danger);color:#fff;border-radius:10px;padding:0 6px;font-size:10px;font-weight:700">${PC.partners.filter(x=>!x.is_approved).length} to approve</span>`:''}</button></div>
       <button class="btn btn-p btn-sm" onclick="openPartnerModal()">+ Create Partner Account</button></div>
     ${PC.view==='partners'?pcPartnersHtml():`
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${chips.map(([k,l])=>`<button class="btn ${PC.filter===k?'btn-p':'btn-o'} btn-sm" onclick="PC.filter='${k}';drawPC()">${l} (${PC.orders.filter(F[k]).length})</button>`).join('')}</div>
@@ -420,15 +420,22 @@ async function pcCancel(id){
 /* ─── PARTNERS LIST ─── */
 function pcPartnersHtml(){
   if(!PC.partners.length)return '<div class="empty"><div class="empty-i">🤝</div><p>No partners yet.</p></div>';
-  return PC.partners.map(p=>{
+  const sorted=PC.partners.slice().sort((a,b)=>(a.is_approved===b.is_approved?0:a.is_approved?1:-1));
+  return sorted.map(p=>{
     const os=PC.orders.filter(o=>o.partner_id===p.id&&!o.is_cancelled),owed=os.reduce((n,o)=>n+Math.max(0,o.total-o.amount_paid),0);
     return `<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
-      <div><div style="font-weight:600">${pcEsc(p.business_name)} ${p.is_active?'':pcPill('Paused','#eee','#555')}</div>
+      <div><div style="font-weight:600">${pcEsc(p.business_name)} ${p.is_approved?'':pcPill('Waiting for approval','#FFE8E0','#B0452A')} ${p.is_active?'':pcPill('Paused','#eee','#555')}</div>
         <div class="t-muted" style="font-size:12px">${[p.is_hotel?'Hotel':'',p.is_retail?'Retail':''].filter(Boolean).join(' + ')} · ${pcEsc(p.contact_name||'')} ${pcEsc(p.contact_number||'')} · joined ${fmtDate(p.created_at)}</div>
         <div class="t-muted" style="font-size:12px">${os.length} order${os.length===1?'':'s'}${owed>0?' · owes '+P(owed):''}</div></div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-        <button class="btn btn-p btn-sm" onclick="pcViewAs('${p.id}')">👁 View as partner</button>
+        ${p.is_approved?'':`<button class="btn btn-p btn-sm" onclick="pcApprove('${p.id}')">✓ Approve</button>`}
+        <button class="btn btn-o btn-sm" onclick="pcViewAs('${p.id}')">👁 View as partner</button>
         <button class="btn btn-o btn-sm" onclick="pcToggleActive('${p.id}')">${p.is_active?'Pause account':'Reactivate'}</button></div></div></div>`;}).join('');
+}
+async function pcApprove(id){
+  const p=pcPartner(id);
+  if(!confirm('Approve '+p.business_name+'? They can then shop and place orders.'))return;
+  try{await sbUpdate('mcc_partners',id,{is_approved:true});await pcRefresh();toast('✓ Approved. They can now open their dashboard.');}catch(e){toast('Could not approve: '+e.message);}
 }
 async function pcToggleActive(id){
   const p=pcPartner(id);
@@ -439,11 +446,12 @@ async function pcToggleActive(id){
 /* Red number on the tab: orders needing a payment check or variants. Light check once a minute. */
 async function pcBadgeRefresh(){
   try{
-    const [orders,payments]=await Promise.all([
+    const [orders,payments,pending]=await Promise.all([
       sbGet('mcc_partner_orders','select=id,is_cancelled,variants_assigned&is_cancelled=eq.false'),
-      sbGet('mcc_partner_payments','select=order_id&status=eq.submitted')]);
+      sbGet('mcc_partner_payments','select=order_id&status=eq.submitted'),
+      sbGet('mcc_partners','select=id&is_approved=eq.false')]);
     const pay=new Set(payments.map(p=>p.order_id));
-    const n=orders.filter(o=>pay.has(o.id)||!o.variants_assigned).length, b=$('partners-badge');
+    const n=orders.filter(o=>pay.has(o.id)||!o.variants_assigned).length+pending.length, b=$('partners-badge');
     if(b){b.textContent=n;b.style.display=n?'inline-block':'none';}
   }catch(e){/* quiet */}
 }

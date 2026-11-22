@@ -1,0 +1,4 @@
+-- Applied through the Supabase migration "partner_approval_gate" (2026-11-22).
+-- New partner sign-ups wait for approval; admin-created logins (profile role hotel / retail_partner) and admin inserts are approved automatically.
+-- Partners cannot approve themselves (guard trigger) and cannot place orders until approved (order before-insert trigger).
+-- Admin approves with: update mcc_partners set is_approved = true where id = '<partner id>';  (the Partner Clients tab has an Approve button)
