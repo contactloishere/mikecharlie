@@ -20,7 +20,7 @@ function trkStepsHtml(o) {
   const pct = Math.round(cur / last * 100);
   const bar = `<div class="pbar-wrap"><div class="pbar-top"><span>${cur === last ? 'On its way to you 🎉' : PSTAGES[cur].label}</span><b>${pct}%</b></div>
     <div class="pbar"><div class="pbar-fill" style="width:${pct}%"></div></div></div>`;
-  return bar + `<div class="steps">${PSTAGES.map((s, i) => `<div class="step ${i < cur || (i === cur && cur === last) ? 'done' : i === cur ? 'now' : ''}"><i>${i <= cur ? '✓' : ''}</i>${s.label}${dates[s.id] && i <= cur ? `<small>${payDate(dates[s.id])}</small>` : ''}</div>`).join('')}</div>`;
+  return bar + `<div class="steps">${PSTAGES.map((s, i) => `<div class="step ${i < cur || (i === cur && cur === last) ? 'done' : i === cur ? 'now' : ''}"><i>${i <= cur ? '✓' : ''}</i><span class="sl">${s.label}${dates[s.id] && i <= cur ? `<small>${payDate(dates[s.id])}</small>` : ''}</span></div>`).join('')}</div>`;
 }
 function trkBoxHtml(o) {
   const t = o.tracking; if (!t || !(t.number || t.link)) return '';

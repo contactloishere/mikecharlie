@@ -207,6 +207,13 @@ a{color:inherit}
 .step.done{color:var(--lagoon)}.step.done:before{background:var(--teal)}.step.done i{background:var(--teal);border-color:var(--teal)}
 .step.now{color:var(--lagoon);font-weight:600}.step.now:before{background:var(--teal)}.step.now i{border-color:var(--lagoon);background:var(--lagoon)}
 .step small{display:block;font-weight:400;color:var(--text-muted);font-size:10.5px}
+@media(max-width:640px){
+.steps{flex-direction:column;overflow:visible;margin:14px 0 6px 2px;padding:0}
+.step{flex:none;display:flex;align-items:flex-start;gap:12px;text-align:left;font-size:14px;padding:0 0 18px;min-height:24px}
+.step:last-child{padding-bottom:0}
+.step:before{top:-18px;left:10px;width:2px;height:18px}
+.step i{margin:0;flex-shrink:0}
+.step .sl{padding-top:1px}.step small{font-size:11.5px}}
 .trk{background:var(--success-bg);border:1px solid var(--success-border);border-radius:10px;padding:11px 13px;font-size:13px;color:var(--success);margin-top:10px;line-height:1.55}
 .trk b{font-size:15px;letter-spacing:.03em}
 

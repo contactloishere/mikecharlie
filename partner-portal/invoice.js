@@ -46,7 +46,7 @@ async function ppInvoiceCanvas(o) {
   const addrLines = [o.recipient_name, ...invWrap(scratch, o.address, 560), regionTxt, o.contact_number].filter(Boolean);
   const headH = 408 + addrLines.length * 38 + 10;                 // title, date, billed to block
   const tableH = 74 + rows.reduce((n, r) => n + r.h, 0) + blank * 62;
-  const totalsH = showPaid ? 250 : 190;
+  const totalsH = showPaid ? 296 : 190;
   const noteLines = o.revision_note ? (scratch.font = `italic 400 24px ${SANS}`, invWrap(scratch, 'Note: ' + o.revision_note, 480)) : [];
   const lowerH = Math.max(totalsH, 330, noteLines.length * 34 + 200);
   const footH = 190;
@@ -69,11 +69,9 @@ async function ppInvoiceCanvas(o) {
   x.fillStyle = INV_C.text; x.font = `600 28px ${SANS}`; x.fillText('BILLED TO', M, 312);
   x.font = `600 36px ${SANS}`; x.fillText(String(o.business_name || (PP.partner && PP.partner.business_name) || '').toUpperCase(), M, 358);
   x.font = `400 28px ${SANS}`; addrLines.forEach((ln, i) => x.fillText(ln, M, 408 + i * 38));
-  // logo box
-  const bx = W - M - 330, by = 56;
-  x.fillStyle = INV_C.sandLight; x.fillRect(bx, by, 330, 330);
-  if (logo) { const lw = 290, lh = lw * logo.height / logo.width; x.drawImage(logo, bx + 20, by + (330 - lh) / 2, lw, lh); }
-  else { x.fillStyle = INV_C.teal; x.font = `600 56px ${SANS}`; x.textAlign = 'center'; x.fillText('mikecharlie', bx + 165, by + 180); x.textAlign = 'left'; }
+  // logo, top right
+  if (logo) { const lw = 340, lh = lw * logo.height / logo.width; x.drawImage(logo, W - M - lw, 96 - lh / 2, lw, lh); }
+  else { x.fillStyle = INV_C.teal; x.font = `600 56px ${SANS}`; x.textAlign = 'right'; x.fillText('mikecharlie', W - M, 160); x.textAlign = 'left'; }
 
   // table header
   let y = topH;
@@ -122,7 +120,7 @@ async function ppInvoiceCanvas(o) {
   if (noteLines.length) { x.fillStyle = INV_C.goldenDark; x.font = `italic 400 24px ${SANS}`; noteLines.forEach((ln, i) => x.fillText(ln, M + 34, y + lowerH - 40 - 50 + i * 34 - (noteLines.length - 1) * 34)); }
   // PAID stamp
   if (o.pay_status === 'paid') {
-    x.save(); x.translate(M + 330, y + 40 + totalsH - 30); x.rotate(-0.2); x.strokeStyle = INV_C.success; x.fillStyle = INV_C.success; x.lineWidth = 6;
+    x.save(); x.translate(M + 440, y + 40 + 110); x.rotate(-0.2); x.strokeStyle = INV_C.success; x.fillStyle = INV_C.success; x.lineWidth = 6;
     x.strokeRect(-100, -44, 200, 88); x.font = `700 56px ${SANS}`; x.textAlign = 'center'; x.fillText('PAID', 0, 20); x.restore();
   }
   y += lowerH;
