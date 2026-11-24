@@ -189,15 +189,16 @@ function pcReprice(lines){
   });
 }
 function pcMaxW(pn){return Math.max(0,...S.skus.filter(s=>s.product_name===pn).map(s=>Number(s.weight_g)||0));}
-function pcWeightKg(lines){
+function pcProductKg(lines){
   let g=0;
   lines.forEach(l=>{
     if(l.kind==='product'){const s=pcSku(l.sku_id);g+=(s?Number(s.weight_g)||0:Number(l.weight_g)||0)*l.qty;}
     else if(l.kind==='assorted')g+=pcMaxW(l.name)*l.qty;
     else if(l.kind==='set')g+=(l.contents||[]).reduce((n,c)=>n+c.qty*pcMaxW(c.product_name),0)*l.qty;
   });
-  const kg=g/1000;return kg+partnerPackingKg(kg);
+  return g/1000;
 }
+function pcWeightKg(lines){const kg=pcProductKg(lines);return kg+partnerPackingKg(kg);}
 
 /* ─── EDIT ORDER ─── */
 function pcEditStart(id){
@@ -235,7 +236,10 @@ function pcEditHtml(o){
 }
 function pcShipSuggest(o){
   const E=PC.edit;
-  if(o.courier==='lbc')return {txt:'<span class="t-muted" style="font-size:12px">LBC order: type the LBC fee.</span>'};
+  if(o.courier==='lbc'){
+    const kg=pcProductKg(E.lines),f=getLbcRate(kg);
+    return {txt:f==null?'<span class="t-muted" style="font-size:12px">LBC order over 19 kg: type the LBC fee.</span>':`<span class="t-muted" style="font-size:12px">LBC for ${pc2(kg)} kg (no packing add-on): <b>${P(f)}</b></span> <button class="btn btn-o btn-sm" onclick="PC.edit.shipping=${f};drawPC()">Use</button>`};
+  }
   if(!o.region_id)return {txt:''};
   const fee=getShippingRate(o.region_id,pcWeightKg(E.lines));
   return {txt:fee==null?'':`<span class="t-muted" style="font-size:12px">Suggested for ${pc2(pcWeightKg(E.lines))} kg: <b>${P(fee)}</b></span> <button class="btn btn-o btn-sm" onclick="PC.edit.shipping=${fee};drawPC()">Use</button>`};

@@ -208,7 +208,7 @@ function ppShowReceipt(o) {
     more > 0 ? `<div class="rc-c rc-s">+ ${more} more item${more === 1 ? '' : 's'}</div>` : '',
     `<div class="rc-dash"></div>`,
     `<div class="rc-row"><span>Products</span><span>${money(o.subtotal)}</span></div>`,
-    `<div class="rc-row"><span>Shipping</span><span>${o.courier === 'lbc' ? 'to follow' : money(o.shipping_fee)}</span></div>`,
+    `<div class="rc-row"><span>Shipping</span><span>${o.courier === 'lbc' && !Number(o.shipping_fee) ? 'to follow' : money(o.shipping_fee)}</span></div>`,
     `<div class="rc-row rc-big"><span>TOTAL</span><span>PHP ${money(o.total)}</span></div>`,
     `<div class="rc-dash"></div>`,
     `<div class="rc-c">Thank you, ${ppEsc((PP.partner && PP.partner.business_name) || 'partner')}!</div>`,

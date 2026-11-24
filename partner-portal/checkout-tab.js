@@ -98,7 +98,7 @@ function ckLineInfo(l) {
   return { name: sku.product_name, sub: l.kind === 'assorted' ? 'Assorted, variants chosen by us' : (sku.variant || ''), unit: ppUnitPrice(sku, PP.draft) };
 }
 function ckProductsTotal() { return PP.draft.reduce((n, l) => { const i = ckLineInfo(l); return n + i.unit * l.qty; }, 0); }
-function ckWeightKg() {
+function ckProductKg() {
   let g = 0;
   const maxW = pn => Math.max(0, ...SHOP.skus.filter(s => s.product_name === pn).map(s => Number(s.weight_g) || 0));
   PP.draft.forEach(l => {
@@ -106,16 +106,19 @@ function ckWeightKg() {
     else if (l.kind === 'product') { const s = SHOP.skus.find(x => x.id === l.sku_id); if (s) g += (Number(s.weight_g) || 0) * l.qty; }
     else g += maxW(l.product_name) * l.qty;
   });
-  const kg = g / 1000;
-  return kg + partnerPackingKg(kg);
+  return g / 1000;
 }
+function ckWeightKg() { const kg = ckProductKg(); return kg + partnerPackingKg(kg); }   // SPX / J&T: product weight plus the packing add-on
 function ckRegion() {
   if (CK.sel === 'new') return CK.f.region || '';
   const a = CK.addresses.find(x => x.id === CK.sel); return a ? a.region_id || '' : '';
 }
 function ckShipping() {
   const r = ckRegion(); if (!r) return { fee: null, note: 'Choose your region to see shipping' };
-  if (CK.courier === 'lbc') return { fee: 0, lbc: true, note: 'LBC fee is added by us after you order (we send an updated invoice)' };
+  if (CK.courier === 'lbc') {
+    const f = getLbcRate(ckProductKg());   // LBC is priced on product weight only, no packing add-on
+    return f == null ? { fee: 0, lbc: true, note: 'Your order is over 19 kg, so we add the LBC fee after you order (we send an updated invoice)' } : { fee: f, note: '' };
+  }
   const fee = getShippingRate(r, ckWeightKg());
   return { fee, note: '' };
 }
@@ -187,7 +190,7 @@ function ckRenderCourier() {
   if (!ckRegion()) { box.innerHTML = '<p class="muted" style="font-size:13px">Choose where it is going and your courier options appear here.</p>'; return; }
   const palawan = ckRegion() === 'palawan';
   box.innerHTML = `<label class="opt ${CK.courier !== 'lbc' ? 'on' : ''}"><input type="radio" name="ck-c" ${CK.courier !== 'lbc' ? 'checked' : ''} onchange="ckPickCourier('spx')"><span><b>SPX / J&amp;T</b><small>Standard shipping, fee shown in your total</small></span></label>` +
-    (palawan ? `<label class="opt ${CK.courier === 'lbc' ? 'on' : ''}"><input type="radio" name="ck-c" ${CK.courier === 'lbc' ? 'checked' : ''} onchange="ckPickCourier('lbc')"><span><b>LBC</b><small>We add the LBC fee to your invoice after you order</small></span></label>` : '');
+    (palawan ? `<label class="opt ${CK.courier === 'lbc' ? 'on' : ''}"><input type="radio" name="ck-c" ${CK.courier === 'lbc' ? 'checked' : ''} onchange="ckPickCourier('lbc')"><span><b>LBC</b><small>Fee shown in your total</small></span></label>` : '');
 }
 function ckPickCourier(c) { CK.courier = c; ckPersist(); ckRenderCourier(); ckRenderTotals(); }
 
@@ -279,7 +282,7 @@ function ckShowDone(o, payMsg) {
   const note = payMsg === 'sent' ? '<p style="font-size:13.5px;line-height:1.6;margin:10px 0 14px">We received your payment screenshot. We will check it and start preparing your order. You just have to wait for our confirmation.</p>'
     : payMsg === 'failed' ? '<p style="font-size:13.5px;line-height:1.6;margin:10px 0 14px;color:var(--danger)">Your order is placed, but the payment screenshot did not go through. Please send it from the Payment tab.</p>'
     : '<p style="font-size:13.5px;line-height:1.6;margin:10px 0 14px">Your order is placed. Send your payment from the Payment tab whenever you are ready, and we will start preparing it once we confirm it.</p>';
-  const lbc = o.courier === 'lbc' ? '<p class="muted" style="font-size:12.5px;line-height:1.55">We will add the LBC shipping fee and send you an updated invoice.</p>' : '';
+  const lbc = o.courier === 'lbc' && !Number(o.shipping_fee) ? '<p class="muted" style="font-size:12.5px;line-height:1.55">We will add the LBC shipping fee and send you an updated invoice.</p>' : '';
   ppEl('tab-body').innerHTML = `<div class="card center" style="max-width:520px;margin:1rem auto">
     <div style="font-size:34px">🌿</div><h2>Thank you, your order is submitted</h2>
     <p style="margin:6px 0 4px"><span class="badge">${ppEsc(o.order_code)}</span></p>

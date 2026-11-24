@@ -119,13 +119,22 @@ async function submitNewListing(){
   }catch(e){toast('Error: '+e.message);}
 }
 
+/* The shared settings as saved: weight goes to every variant only when a number was typed (empty = leave as is) */
+function weightPatch(sh){
+  const o=Object.assign({},sh);
+  if(o.weight_g==null){delete o.weight_g;}else{o.weight_kg=Math.round(o.weight_g)/1000;}
+  return o;
+}
 function defaultSharedSettings(){
   return {category_id:null,location:'studio',unit_cost:0,ribbon_text:null,low_stock_threshold:5};
 }
 function deriveSharedSettings(variants){
   if(!variants.length)return defaultSharedSettings();
   const first=variants[0];
+  // weight is shown only when every variant weighs the same (otherwise the box stays empty and nothing is overwritten)
+  const ws=[...new Set(variants.filter(v=>!v._isNew).map(v=>Number(v.weight_g)||0))];
   return {
+    weight_g:ws.length===1&&ws[0]>0?ws[0]:null,
     category_id:first.category_id||null,
     location:first.location||'studio',
     unit_cost:first.unit_cost||0,
@@ -178,7 +187,9 @@ function readGeneralFromDom(){
     listing['subsection_'+n+'_body']=$('pl-sub'+n+'-body').value;
   }
   const th=parseInt($('ls-threshold').value);
+  const wv=$('ls-weight')?parseInt($('ls-weight').value):NaN;
   const shared={
+    weight_g:isNaN(wv)||wv<0?null:wv,
     category_id:$('ls-cat').value||null,
     location:$('ls-loc').value,
     unit_cost:parseFloat($('ls-cost').value)||0,
@@ -235,6 +246,9 @@ function renderListingDetail(){
       <div><label class="lbl">Unit Cost (₱)</label><input class="inp" type="number" step="0.01" id="ls-cost" value="${s.unit_cost||0}"></div>
       <div><label class="lbl">Low Stock Threshold</label><input class="inp" type="number" id="ls-threshold" value="${s.low_stock_threshold!=null?s.low_stock_threshold:5}"></div>
     </div>
+    <label class="lbl">Weight per piece (grams)</label>
+    <input class="inp" type="number" min="0" step="1" id="ls-weight" value="${s.weight_g!=null?s.weight_g:''}" placeholder="${(PS.variants||[]).length>1&&s.weight_g==null&&(PS.variants||[]).some(v=>Number(v.weight_g)>0)?'Weights differ by variant. Type a number to set all':'e.g. 120'}">
+    <p class="t-muted" style="font-size:11px;margin:-8px 0 12px">Used to work out shipping on shop and partner orders. Leave it empty to keep the weights as they are.</p>
     <label class="lbl">Ribbon Text</label>
     <input class="inp" id="ls-ribbon" value="${attrEsc(s.ribbon_text)}" placeholder="e.g. Bestseller, New Arrival">
     <button class="btn btn-p" id="gen-save-btn" style="margin-top:4px" onclick="saveGeneral()">Save General</button>
@@ -313,14 +327,14 @@ async function saveGeneral(){
     if(existing.length){
       const r=await fetch(`${SB_URL}/rest/v1/skus?product_name=eq.${encodeURIComponent(newTitle)}`,{
         method:'PATCH',headers:authHeaders({'Content-Type':'application/json'}),
-        body:JSON.stringify(shared)
+        body:JSON.stringify(weightPatch(shared))
       });
       if(!r.ok)throw new Error(await r.text());
     }
     PS.sharedSettings=shared;
     PS.draft=null;
-    PS.variants.forEach(v=>Object.assign(v,shared));
-    PS.allSkus.forEach(s=>{if(s.product_name===newTitle)Object.assign(s,shared);});
+    PS.variants.forEach(v=>Object.assign(v,weightPatch(shared)));
+    PS.allSkus.forEach(s=>{if(s.product_name===newTitle)Object.assign(s,weightPatch(shared));});
     Object.assign(PS.currentListing,payload);
     toast('✓ General saved!');
   }catch(e){
@@ -439,7 +453,7 @@ function addNewVariant(){
     id:null,_tempId:tempId,_isNew:true,product_name:PS.currentTitle,
     sku_code:pre?nextPrelovedSku():'',variant:'',category_id:s.category_id,location:s.location,unit_cost:s.unit_cost,
     current_stock:pre?1:0,retail_price_direct:null,retail_price_shopee:null,
-    is_on_sale:false,sale_price:null,ribbon_text:s.ribbon_text,low_stock_threshold:s.low_stock_threshold,
+    is_on_sale:false,sale_price:null,ribbon_text:s.ribbon_text,low_stock_threshold:s.low_stock_threshold,weight_g:s.weight_g!=null?s.weight_g:0,
     supplier_source:null,notes:null,is_active:true,web_status:'shown',photo_url:'',_recipeRows:[]
   });
   PS.expandedId=tempId;
@@ -569,6 +583,7 @@ async function saveVariant(key){
     sale_price:salePrice?parseFloat(salePrice):null,
     ribbon_text:shared.ribbon_text,
     low_stock_threshold:shared.low_stock_threshold,
+    ...(shared.weight_g!=null?{weight_g:shared.weight_g,weight_kg:shared.weight_g/1000}:{}),
     supplier_source:$('v-supplier-'+key).value.trim()||null,
     notes:$('v-notes-'+key).value.trim()||null,
     is_active:$('v-active-'+key).checked,

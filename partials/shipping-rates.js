@@ -3,7 +3,7 @@
 //
 // Each region has its own weight tiers: { max: upper bound in kg (inclusive), fee: PHP }.
 // The last tier is open-ended (Infinity), so any weight gets a rate and nothing needs a manual quote.
-// `lbc: true` marks regions where customers may also choose LBC (rates to be added later).
+// `lbc: true` marks regions where customers may also choose LBC (see LBC_TIERS below).
 
 const SHIPPING_RATES = [
   { id: "ilocos_ilocos_norte", label: "Ilocos — Ilocos Norte, Ilocos Sur, La Union, Pangasinan",
@@ -83,4 +83,15 @@ function getShippingRate(regionId, totalWeightKg) {
   const w = Math.round(Number(totalWeightKg || 0) * 1000) / 1000;
   const tier = region.tiers.find(t => w <= t.max);
   return tier ? tier.fee : null;
+}
+
+
+/* LBC (Palawan only). Rates from Lois, Nov 2026. Priced on the product weight alone:
+   the box and padding add-on (partnerPackingKg) is NOT added for LBC. Above 19 kg there is no listed rate (null),
+   so the fee is typed in by hand on the invoice. */
+const LBC_TIERS = [{ max: 1, fee: 240 }, { max: 3, fee: 290 }, { max: 5, fee: 500 }, { max: 10, fee: 770 }, { max: 19, fee: 1200 }];
+function getLbcRate(productWeightKg) {
+  const w = Math.round(Number(productWeightKg || 0) * 1000) / 1000;
+  const t = LBC_TIERS.find(x => w <= x.max);
+  return t ? t.fee : null;
 }
