@@ -95,3 +95,17 @@ function getLbcRate(productWeightKg) {
   const t = LBC_TIERS.find(x => w <= x.max);
   return t ? t.fee : null;
 }
+
+
+/* Courier tracking pages. J&T and LBC always use the same page, so it is filled in automatically.
+   SPX has a different link for every parcel: Lois pastes it in when she ships, and the SPX home page is only a fallback. */
+const COURIER_TRACK = {
+  spx: { name: 'SPX', page: 'https://spx.ph/', fixed: false },
+  jnt: { name: 'J&T', page: 'https://www.jtexpress.ph/track-and-trace', fixed: true },
+  lbc: { name: 'LBC', page: 'https://www.lbcexpress.com/track/', fixed: true }
+};
+function courierTrackUrl(type, link) {
+  const c = COURIER_TRACK[type]; if (!c) return /^https?:\/\/\S+$/i.test(String(link || '').trim()) ? String(link).trim() : '';
+  if (c.fixed) return c.page;
+  return /^https?:\/\/\S+$/i.test(String(link || '').trim()) ? String(link).trim() : c.page;
+}

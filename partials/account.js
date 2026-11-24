@@ -181,19 +181,50 @@ async function unheart(skuId) {
 }
 
 /* ─── ORDERS ─── */
+/* Live updates: every 20 seconds (and when the customer returns to the page) the orders are fetched again.
+   If a stage or the tracking changed, the screen the customer is looking at is redrawn in place. */
+let ACC_LIVE = { open: null, timer: null, busy: false };
+async function refreshOrdersLive() {
+  if (ACC_LIVE.busy || !ACC.session || document.hidden) return;
+  ACC_LIVE.busy = true;
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/mcc_orders?customer_id=eq.${ACC.session.user.id}&select=*&order=created_at.desc`, { headers: sbHeaders() });
+    if (!res.ok) return;
+    const orders = await res.json();
+    if (!Array.isArray(orders)) return;
+    const sig = l => JSON.stringify(l.map(o => [o.id, o.current_stage, o.courier, o.tracking, o.is_cancelled, o.stage_dates]));
+    if (sig(orders) === sig(ACC.orders)) return;
+    const known = new Set(ACC.orders.map(o => o.id));
+    ACC.orders = orders;
+    if (orders.some(o => !known.has(o.id))) {
+      const items = await fetch(`${SB_URL}/rest/v1/mcc_order_items?order_id=in.(${orders.map(o => o.id).join(',')})&select=*`, { headers: sbHeaders() }).then(r => r.json());
+      ACC.orderItemsByOrder = {};
+      items.forEach(it => { (ACC.orderItemsByOrder[it.order_id] ||= []).push(it); });
+    }
+    if (ACC_LIVE.open && ACC.orders.some(o => o.id === ACC_LIVE.open)) { const y = window.scrollY; $('orders-list').innerHTML = renderOrderDetail(ACC.orders.find(o => o.id === ACC_LIVE.open)); window.scrollTo(0, y); }
+    else if (!ACC_LIVE.open) switchOrderTab(ACC.orderTab || 'current');
+  } catch (e) { /* try again next time */ } finally { ACC_LIVE.busy = false; }
+}
+function startOrdersLive() {
+  if (ACC_LIVE.timer) return;
+  ACC_LIVE.timer = setInterval(refreshOrdersLive, 20000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshOrdersLive(); });
+}
+
 async function loadOrders() {
   const orders = await fetch(`${SB_URL}/rest/v1/mcc_orders?customer_id=eq.${ACC.session.user.id}&select=*&order=created_at.desc`, { headers: sbHeaders() }).then(r => r.json());
   ACC.orders = orders;
-  if (!orders.length) { $('orders-list').innerHTML = '<div class="empty-note">No orders yet.</div>'; return; }
+  if (!orders.length) { $('orders-list').innerHTML = '<div class="empty-note">No orders yet.</div>'; startOrdersLive(); return; }
   const orderIds = orders.map(o => o.id).join(',');
   const items = await fetch(`${SB_URL}/rest/v1/mcc_order_items?order_id=in.(${orderIds})&select=*`, { headers: sbHeaders() }).then(r => r.json());
   ACC.orderItemsByOrder = {};
   items.forEach(it => { (ACC.orderItemsByOrder[it.order_id] ||= []).push(it); });
   switchOrderTab('current');
+  startOrdersLive();
 }
 
 function switchOrderTab(which) {
-  ACC.orderTab = which;
+  ACC.orderTab = which; ACC_LIVE.open = null;
   const tabs = document.querySelector('.order-tabs');
   if (tabs) tabs.style.display = 'flex';
   document.querySelectorAll('.order-tab').forEach(b => b.classList.toggle('on', b.dataset.ot === which));
@@ -213,13 +244,24 @@ const fmtDate = d => d ? new Date(d).toLocaleDateString('en-PH', { month: 'short
 
 function currentStatusLabel(order) {
   if (order.is_cancelled) return 'Cancelled';
-  if (order.current_stage === 'shipped' && order.courier) return `Order picked up by ${order.courier === 'spx' ? 'SPX' : 'J&T'}`;
+  if (order.current_stage === 'shipped' && order.courier) return `Order picked up by ${(COURIER_INFO[order.courier] || {}).name || 'the courier'}`;
   return STAGE_LABELS[order.current_stage] || 'Order placed';
 }
 function thumbHtml(item, cls) {
   // Small picture of the product. If the picture is missing or fails to load, an empty soft box shows instead.
   if (!item.cover_image_url) return `<div class="${cls}"></div>`;
   return `<img class="${cls}" src="${esc(item.cover_image_url)}" alt="" loading="lazy" decoding="async" onerror="this.style.visibility='hidden'">`;
+}
+
+/* Shipped orders show the tracking number and a Track button right on the list card. */
+function summaryTrackingHtml(order) {
+  if (order.is_cancelled || order.current_stage !== 'shipped') return '';
+  const p = trackingParts(order), target = p.url || p.courier.page;
+  if (!p.number && !target) return '';
+  return `<div class="sum-track" onclick="event.stopPropagation()">
+    <span class="sum-track-no">${esc(p.courier.name)}${p.number ? ' &middot; ' + esc(p.number) : ''}</span>
+    ${target ? `<a class="track-btn track-btn-s" href="${esc(target)}" target="_blank" rel="noopener">Track my package</a>` : ''}
+  </div>`;
 }
 
 /* ─── ORDER LIST CARD (short version, tap to open) ─── */
@@ -240,6 +282,7 @@ function renderOrderSummary(order) {
       <span class="order-items-mini">${count} item${count === 1 ? '' : 's'}</span>
       <span class="order-total">${P(order.total)}</span>
     </div>
+    ${summaryTrackingHtml(order)}
     <div class="view-link">View order details &rsaquo;</div>
   </div>`;
 }
@@ -250,6 +293,7 @@ function openOrderDetail(orderId) {
   if (!order) return;
   const tabs = document.querySelector('.order-tabs');
   if (tabs) tabs.style.display = 'none';
+  ACC_LIVE.open = orderId;
   $('orders-list').innerHTML = renderOrderDetail(order);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -259,17 +303,16 @@ function closeOrderDetail() {
 
 function buildStageRows(order) {
   const currentIdx = STAGES.indexOf(order.current_stage);
-  // Customers only see steps that have happened so far. Future steps stay hidden.
+  // One vertical line of steps (on phones and desktop): finished steps are ticked, the rest are greyed out.
   return STAGES.map((key, i) => {
-    if (i > currentIdx) return '';
-    const date = order.stage_dates && order.stage_dates[key];
+    const done = i <= currentIdx, date = order.stage_dates && order.stage_dates[key];
     let label = STAGE_LABELS[key];
-    if (key === 'shipped' && order.courier) label = `Order picked up by ${order.courier === 'spx' ? 'SPX' : 'J&T'}`;
-    return `<div class="stage-row">
-      <div class="stage-dot done">&#10003;</div>
+    if (key === 'shipped' && order.courier) label = `Order picked up by ${(COURIER_INFO[order.courier] || {}).name || 'the courier'}`;
+    return `<div class="stage-row${i < currentIdx ? ' done-line' : ''}${i === currentIdx ? ' now' : ''}${i === STAGES.length - 1 ? ' last' : ''}">
+      <div class="stage-dot ${done ? 'done' : 'pending'}">${done ? '&#10003;' : ''}</div>
       <div class="stage-text">
-        <div class="stage-label">${label}</div>
-        ${date ? `<div class="stage-date">${fmtDate(date)}</div>` : ''}
+        <div class="stage-label${done ? '' : ' pending-label'}">${label}</div>
+        ${date && done ? `<div class="stage-date">${fmtDate(date)}</div>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -277,12 +320,14 @@ function buildStageRows(order) {
 /* Tracking box. The courier page needs the tracking number typed in, so the number is always shown (tap to copy).
    A "Track my package" button opens the exact tracking page when Lois pasted a full web address (https://...);
    otherwise it opens the courier's own tracking page. A saved value that is not a real web address is never used as a link. */
-const COURIER_INFO = { spx: { name: 'SPX', page: 'https://spx.ph/' }, jnt: { name: 'J&T', page: 'https://www.jtexpress.ph/track-and-trace' } };
+const COURIER_INFO = { spx: { name: 'SPX', page: 'https://spx.ph/', fixed: false }, jnt: { name: 'J&T', page: 'https://www.jtexpress.ph/track-and-trace', fixed: true }, lbc: { name: 'LBC', page: 'https://www.lbcexpress.com/track/', fixed: true } };
 function trackingParts(order) {
   const t = order.tracking || {}, type = order.courier || t.type;
   const isUrl = v => /^https?:\/\/\S+$/i.test(String(v || '').trim());
   const number = String(t.number || (t.link && !isUrl(t.link) ? t.link : '') || '').trim();
-  const url = isUrl(t.link) ? String(t.link).trim() : '';
+  const info = COURIER_INFO[type];
+  // J&T always uses its one tracking page. SPX uses the link Lois pasted for that parcel, or the SPX site if there is none.
+  const url = info && info.fixed ? info.page : isUrl(t.link) ? String(t.link).trim() : '';
   return { type, courier: COURIER_INFO[type] || { name: 'the courier', page: '' }, number, url };
 }
 function copyTracking(btn, text) {
@@ -292,8 +337,8 @@ function copyTracking(btn, text) {
 function buildTrackingHtml(order) {
   if (order.current_stage !== 'shipped' || !order.tracking) return '';
   const p = trackingParts(order);
-  if (!p.number && !p.url) return '';
   const target = p.url || p.courier.page;
+  if (!p.number && !target) return '';
   return `<div class="tracking-box">Your package is on its way with ${esc(p.courier.name)}.
     ${p.number ? `<div>Tracking number:</div><div class="tracking-num">${esc(p.number)}</div> <button type="button" class="copy-btn" onclick="copyTracking(this,'${esc(p.number)}')">Copy</button>` : ''}
     ${target ? `<div style="margin-top:8px"><a class="track-btn" href="${esc(target)}" target="_blank" rel="noopener">Track my package &rarr;</a></div>` : ''}

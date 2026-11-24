@@ -107,7 +107,7 @@ function moCard(o){
   }else{
     const t=o.tracking||{};
     const num=t.number||(t.link&&!/^https?:\/\//i.test(t.link)?t.link:'');
-    const url=/^https?:\/\//i.test(t.link||'')?t.link:'';
+    const url=courierTrackUrl(o.courier||t.type,t.link);
     actions=`<div style="flex:1;min-width:240px"><span class="t-muted" style="font-size:12.5px">Shipped via ${o.courier==='spx'?'SPX':'J&amp;T'}${num?' · No. <b>'+num+'</b>':''}${url?' · <a href="'+url+'" target="_blank" rel="noopener" style="color:var(--lagoon);font-weight:600">tracking link</a>':''}</span></div>
       <button class="btn btn-o btn-sm" onclick="moEditTracking('${o.id}')">Edit tracking</button>
       <div id="mo-edit-${o.id}" style="width:100%"></div>`;
@@ -157,15 +157,24 @@ async function moAdvance(id,stage){
 /* Ship-out form: courier, tracking number (what the customer types on the courier site) and an optional
    full tracking link (https://...). Used when marking shipped and when editing the tracking afterwards. */
 function moShipForm(id,courier,number,link,btnLabel){
+  const q=v=>(v||'').replace(/"/g,'&quot;');
+  const isSpx=courier==='spx';
   return `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;width:100%">
-    <div><label class="lbl" style="margin:0 0 3px">Courier</label><select class="inp" id="mo-courier-${id}" style="min-width:110px;margin:0">
+    <div><label class="lbl" style="margin:0 0 3px">Courier</label><select class="inp" id="mo-courier-${id}" style="min-width:110px;margin:0" onchange="moCourierChange('${id}')">
       <option value="">Choose</option><option value="spx" ${courier==='spx'?'selected':''}>SPX</option><option value="jnt" ${courier==='jnt'?'selected':''}>J&amp;T</option></select></div>
     <div style="flex:1;min-width:170px"><label class="lbl" style="margin:0 0 3px">Tracking number <span style="color:var(--danger)">*</span></label>
-      <input class="inp" id="mo-track-${id}" placeholder="e.g. SPXPH0123456789" value="${(number||'').replace(/"/g,'&quot;')}" style="margin:0"></div>
-    <div style="flex:1.4;min-width:200px"><label class="lbl" style="margin:0 0 3px">Tracking link <span class="t-muted">(optional, starts with https://)</span></label>
-      <input class="inp" id="mo-link-${id}" placeholder="https://..." value="${(link||'').replace(/"/g,'&quot;')}" style="margin:0"></div>
+      <input class="inp" id="mo-track-${id}" placeholder="e.g. SPXPH0123456789" value="${q(number)}" style="margin:0"></div>
+    <div id="mo-linkwrap-${id}" style="flex:1.4;min-width:200px;${isSpx?'':'display:none'}"><label class="lbl" style="margin:0 0 3px">SPX tracking link <span style="color:var(--danger)">*</span> <span class="t-muted">(paste the link for this parcel)</span></label>
+      <input class="inp" id="mo-link-${id}" placeholder="https://..." value="${q(link)}" style="margin:0"></div>
+    <div id="mo-auto-${id}" class="t-muted" style="flex:1.4;min-width:200px;font-size:12.5px;${isSpx?'display:none':''}">${courier==='jnt'?'J&amp;T tracking link is added automatically.':'Choose SPX or J&amp;T. The J&amp;T link is added automatically.'}</div>
     <button class="btn btn-p btn-sm" onclick="moShip('${id}')">${btnLabel}</button>
   </div>`;
+}
+function moCourierChange(id){
+  const c=$('mo-courier-'+id).value;
+  $('mo-linkwrap-'+id).style.display=c==='spx'?'':'none';
+  const a=$('mo-auto-'+id);a.style.display=c==='spx'?'none':'';
+  a.innerHTML=c==='jnt'?'J&amp;T tracking link is added automatically.':'Choose SPX or J&amp;T. The J&amp;T link is added automatically.';
 }
 function moEditTracking(id){
   const o=MO.orders.find(x=>x.id===id),t=o.tracking||{};
@@ -177,15 +186,16 @@ async function moShip(id){
   const o=MO.orders.find(x=>x.id===id);
   const courier=$('mo-courier-'+id).value;
   const number=$('mo-track-'+id).value.trim();
-  let link=$('mo-link-'+id).value.trim();
+  let link=courier==='spx'?$('mo-link-'+id).value.trim():'';
   if(!courier){toast('Choose a courier first.');return;}
   if(!number){toast('Enter the tracking number. Customers type it on the courier website.');return;}
-  if(link){
+  if(courier==='spx'){
+    if(!link){toast('Paste the SPX tracking link for this parcel.');return;}
     if(!/^https?:\/\//i.test(link)&&/^www\./i.test(link))link='https://'+link;
-    if(!/^https?:\/\/\S+\.\S+/i.test(link)){toast('The tracking link must be a full web address starting with https://. Leave it empty if you only have the number.');return;}
+    if(!/^https?:\/\/\S+\.\S+/i.test(link)){toast('The SPX tracking link must be a full web address starting with https://');return;}
   }
   const tracking={type:courier,number};
-  if(link)tracking.link=link;
+  tracking.link=courier==='jnt'?COURIER_TRACK.jnt.page:link;
   try{
     const patch={courier,tracking};
     if(o.current_stage!=='shipped'){patch.current_stage='shipped';patch.stage_dates=moStamp(o,'shipped');}

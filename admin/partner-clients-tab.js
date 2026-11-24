@@ -384,13 +384,45 @@ function pcStageHtml(o){
   if(o.is_cancelled)act='';
   else if(o.pay_status!=='paid')act='<div class="t-muted" style="font-size:12.5px">Tracking steps open once every payment is confirmed.</div>';
   else if(!o.variants_assigned)act='<div class="t-muted" style="font-size:12.5px">Choose the variants for the assorted items first.</div>';
-  else if(next&&next.id==='shipped')act=`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-      <select class="inp" id="ps-type" style="width:120px;margin:0"><option value="spx">SPX</option><option value="jnt">J&amp;T</option><option value="lbc">LBC</option></select>
-      <input class="inp" id="ps-num" placeholder="Tracking number" style="width:190px;margin:0"><input class="inp" id="ps-link" placeholder="Tracking link (optional)" style="width:230px;margin:0">
-      <button class="btn btn-p btn-sm" onclick="pcShip('${o.id}')">Mark as shipped</button></div>`;
+  else if(next&&next.id==='shipped')act=pcTrkForm(o,o.courier||'spx','','','Mark as shipped','pcShip');
   else if(next)act=`<button class="btn btn-p btn-sm" onclick="pcStage('${o.id}','${next.id}')">Mark: ${next.label}</button>`;
   return dots+`<div style="margin-top:6px">${act}${cur>1&&!o.is_cancelled?` <button class="btn btn-o btn-sm" onclick="pcStageBack('${o.id}')">Undo last step</button>`:''}</div>`+
-    (o.tracking?`<div class="t-muted" style="font-size:12.5px;margin-top:6px">Tracking: ${pcEsc((o.tracking.type||'').toUpperCase())} ${pcEsc(o.tracking.number||'')} ${o.tracking.link?'<a href="'+pcEsc(o.tracking.link)+'" target="_blank" rel="noopener">link</a>':''}</div>`:'');
+    (o.tracking?`<div class="t-muted" style="font-size:12.5px;margin-top:6px">Tracking: ${pcEsc((o.tracking.type||'').toUpperCase())} <b>${pcEsc(o.tracking.number||'')}</b> ${(()=>{const u=courierTrackUrl(o.tracking.type||o.courier,o.tracking.link);return u?'<a href="'+pcEsc(u)+'" target="_blank" rel="noopener">tracking link</a>':'';})()}
+      ${o.current_stage==='shipped'&&!o.is_cancelled?`<button class="btn btn-o btn-sm" style="margin-left:6px" onclick="pcEditTrk('${o.id}')">Edit tracking</button>`:''}</div><div id="pc-trk-${o.id}"></div>`:'');
+}
+/* Tracking form: courier, tracking number (required for every courier). J&T and LBC links are added automatically;
+   SPX needs the link for that parcel pasted in. */
+function pcTrkForm(o,type,num,link,btn,fn){
+  const id=o.id,q=v=>pcEsc(v||'');
+  return `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+    <div><label class="lbl" style="margin:0 0 3px">Courier</label><select class="inp" id="ps-type-${id}" style="width:110px;margin:0" onchange="pcTrkType('${id}')">${['spx','jnt','lbc'].map(k=>`<option value="${k}" ${type===k?'selected':''}>${COURIER_TRACK[k].name}</option>`).join('')}</select></div>
+    <div style="flex:1;min-width:170px"><label class="lbl" style="margin:0 0 3px">Tracking number <span style="color:var(--danger)">*</span></label><input class="inp" id="ps-num-${id}" placeholder="Tracking number" value="${q(num)}" style="margin:0"></div>
+    <div id="ps-linkwrap-${id}" style="flex:1.4;min-width:200px;${type==='spx'?'':'display:none'}"><label class="lbl" style="margin:0 0 3px">SPX tracking link <span style="color:var(--danger)">*</span></label><input class="inp" id="ps-link-${id}" placeholder="https://..." value="${q(link)}" style="margin:0"></div>
+    <div id="ps-auto-${id}" class="t-muted" style="font-size:12.5px;flex:1.4;min-width:200px;${type==='spx'?'display:none':''}">${type==='lbc'?'LBC':'J&amp;T'} tracking link is added automatically.</div>
+    <button class="btn btn-p btn-sm" onclick="${fn}('${id}')">${btn}</button></div>`;
+}
+function pcTrkType(id){
+  const t=$('ps-type-'+id).value;
+  $('ps-linkwrap-'+id).style.display=t==='spx'?'':'none';
+  const a=$('ps-auto-'+id);a.style.display=t==='spx'?'none':'';a.innerHTML=(t==='lbc'?'LBC':'J&amp;T')+' tracking link is added automatically.';
+}
+function pcEditTrk(id){
+  const o=pcOrder(id),t=o.tracking||{};
+  $('pc-trk-'+id).innerHTML=`<div style="margin-top:8px">${pcTrkForm(o,t.type||o.courier||'spx',t.number||'',t.link||'','Save tracking','pcSaveTrk')}</div>`;
+}
+function pcReadTrk(id){
+  const type=$('ps-type-'+id).value,num=$('ps-num-'+id).value.trim();let link=type==='spx'?$('ps-link-'+id).value.trim():'';
+  if(!num){toast('Enter the tracking number.');return null;}
+  if(type==='spx'){
+    if(!link){toast('Paste the SPX tracking link for this parcel.');return null;}
+    if(!/^https?:\/\//i.test(link)&&/^www\./i.test(link))link='https://'+link;
+    if(!/^https?:\/\/\S+\.\S+/i.test(link)){toast('The SPX tracking link must start with https://');return null;}
+  }else link=COURIER_TRACK[type].page;
+  return {type,number:num,link};
+}
+async function pcSaveTrk(id){
+  const tr=pcReadTrk(id);if(!tr)return;
+  try{await sbUpdate('mcc_partner_orders',id,{tracking:tr});await pcRefresh();toast('✓ Tracking saved. The partner sees it right away.');}catch(e){toast('Could not update: '+e.message);}
 }
 function pcStamp(o,stage){return {...(o.stage_dates||{}),[stage]:new Date().toISOString()};}
 async function pcStage(id,stage){
@@ -398,9 +430,8 @@ async function pcStage(id,stage){
   try{await sbUpdate('mcc_partner_orders',id,{current_stage:stage,stage_dates:pcStamp(o,stage)});await pcRefresh();toast('✓ Updated');}catch(e){toast('Could not update: '+e.message);}
 }
 async function pcShip(id){
-  const o=pcOrder(id),type=$('ps-type').value,num=$('ps-num').value.trim(),link=$('ps-link').value.trim();
-  if(!num&&!link){toast('Add a tracking number or link.');return;}
-  try{await sbUpdate('mcc_partner_orders',id,{current_stage:'shipped',stage_dates:pcStamp(o,'shipped'),tracking:{type,number:num||null,link:link||null}});await pcRefresh();toast('✓ Marked as shipped');}catch(e){toast('Could not update: '+e.message);}
+  const o=pcOrder(id),tr=pcReadTrk(id);if(!tr)return;
+  try{await sbUpdate('mcc_partner_orders',id,{current_stage:'shipped',stage_dates:pcStamp(o,'shipped'),tracking:tr});await pcRefresh();toast('✓ Marked as shipped');}catch(e){toast('Could not update: '+e.message);}
 }
 async function pcStageBack(id){
   const o=pcOrder(id),i=PC_STAGES.findIndex(s=>s.id===o.current_stage);if(i<2)return;

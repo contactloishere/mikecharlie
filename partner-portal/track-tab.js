@@ -24,11 +24,13 @@ function trkStepsHtml(o) {
 }
 function trkBoxHtml(o) {
   const t = o.tracking; if (!t || !(t.number || t.link)) return '';
-  const names = { spx: 'SPX', jnt: 'J&T', lbc: 'LBC' };
-  const courier = names[t.type] || names[o.courier] || 'the courier';
-  const link = t.link ? `<br><a href="${ppEsc(t.link)}" target="_blank" rel="noopener">Track your ${courier} package →</a>` : '';
-  const site = !t.link && t.type === 'jnt' ? '<br>Enter it at <a href="https://www.jtexpress.ph/track-and-trace" target="_blank" rel="noopener">jtexpress.ph/track-and-trace</a>' : '';
-  return `<div class="trk">Your package is on its way with ${courier}.${t.number ? `<br>Tracking number: <b>${ppEsc(t.number)}</b>` : ''}${link}${site}</div>`;
+  const type = t.type || o.courier, courier = (COURIER_TRACK[type] || {}).name || 'the courier';
+  const url = courierTrackUrl(type, t.link);
+  return `<div class="trk">Your package is on its way with ${courier}.${t.number ? `<br>Tracking number: <b>${ppEsc(t.number)}</b> <button type="button" class="copy-btn" onclick="trkCopy(this,'${ppEsc(t.number)}')">Copy</button>` : ''}${url ? `<br><a class="trk-btn" href="${ppEsc(url)}" target="_blank" rel="noopener">Track my package →</a>` : ''}${url && t.number && COURIER_TRACK[type] && COURIER_TRACK[type].fixed ? `<br><small>Type your tracking number on the ${courier} page.</small>` : ''}</div>`;
+}
+function trkCopy(btn, text) {
+  const done = () => { const o = btn.textContent; btn.textContent = 'Copied ✓'; setTimeout(() => { btn.textContent = o; }, 1600); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, () => {}); else done();
 }
 function trkChangeHtml(o) {
   if (o.is_cancelled || ['shipped', 'delivered'].includes(o.current_stage)) return '';
@@ -72,10 +74,28 @@ function trkOrderCard(o) {
   </div>`;
 }
 
+/* Live updates: every 20 seconds (and when the partner comes back to the page) the Track tab checks for changes
+   such as a new stage or edited tracking, and redraws. It waits if the partner is typing a change request. */
+let TRK_LIVE = { timer: null, sig: '' };
+const trkSig = () => JSON.stringify((PAY.orders || []).map(o => [o.id, o.current_stage, o.tracking, o.is_cancelled, o.stage_dates]));
+async function trkLiveCheck() {
+  if (PP.tab !== 'track' || document.hidden || !ppEl('tab-body')) return;
+  const typing = document.activeElement && /TEXTAREA|INPUT/.test(document.activeElement.tagName) || [...document.querySelectorAll('textarea')].some(t => t.value);
+  if (typing) return;
+  try { await ppLoadPartnerData(false); } catch (e) { return; }
+  if (trkSig() !== TRK_LIVE.sig) ppRenderTrack(ppEl('tab-body'));
+}
+function trkStartLive() {
+  if (TRK_LIVE.timer) return;
+  TRK_LIVE.timer = setInterval(trkLiveCheck, 20000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) trkLiveCheck(); });
+}
+
 async function ppRenderTrack(body) {
   try { await ppLoadPartnerData(false); } catch (e) {
     body.innerHTML = `<div class="card center"><h2>We could not load your orders</h2><button class="btn btn-p" style="max-width:260px;margin:12px auto 0" onclick="ppShowTab('track')">Try again</button></div>`; return;
   }
+  TRK_LIVE.sig = trkSig(); trkStartLive();
   const active = PAY.orders.filter(o => o.current_stage !== 'delivered');
   body.innerHTML = `<h2 class="sec-title" style="margin-top:.4rem">Track my order</h2>
     <p class="sec-sub">Where your orders are right now.</p>` +
