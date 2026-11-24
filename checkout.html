@@ -105,6 +105,7 @@ textarea.inp{resize:vertical;min-height:70px}
 .btn{padding:13px;border-radius:9px;font-size:14px;font-weight:500;border:none;text-align:center;flex:1}
 .btn-p{background:var(--lagoon);color:var(--pearl)}
 </style>
+<link rel="stylesheet" href="/partials/invoice.css">
 </head>
 <body>
 
@@ -210,6 +211,10 @@ textarea.inp{resize:vertical;min-height:70px}
     <div class="icon">🌿</div>
     <h2>Order received!</h2>
     <p id="confirm-msg">We'll verify your payment and message you with updates shortly.</p>
+    <div id="confirm-invoice" style="display:none;max-width:320px;margin:0 auto 1.5rem">
+      <button class="btn btn-p" style="width:100%" onclick="ppViewInvoice(CO.lastOrderId)">View invoice</button>
+      <button class="btn" style="width:100%;margin-top:8px;background:transparent;color:var(--lagoon);border:1.5px solid var(--lagoon)" onclick="ppDownloadInvoice(CO.lastOrderId)">Download invoice (PNG)</button>
+    </div>
 
     <div class="confirm-signup-box" id="signup-prompt" style="display:none">
       <h3>Track this order</h3>
@@ -245,6 +250,8 @@ const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 </script>
 <script src="/partials/shipping-rates.js"></script>
 <script src="/partials/shared.js"></script>
+<script src="/partials/invoice.js"></script>
+<script src="/partials/invoice-member.js"></script>
 <script src="/partials/checkout.js"></script>
 </body>
 </html>

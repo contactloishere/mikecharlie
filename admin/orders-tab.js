@@ -103,16 +103,14 @@ function moCard(o){
   }else if(o.current_stage==='payment_confirmed'){
     actions=`<button class="btn btn-p btn-sm" onclick="moAdvance('${o.id}','preparing_order')">Mark Preparing</button>`;
   }else if(o.current_stage==='preparing_order'){
-    actions=`<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;width:100%">
-      <select class="inp" id="mo-courier-${o.id}" style="max-width:140px">
-        <option value="">Courier</option><option value="spx">SPX</option><option value="jnt">J&amp;T</option>
-      </select>
-      <input class="inp" id="mo-track-${o.id}" placeholder="SPX tracking link or J&T number" style="flex:1;min-width:200px">
-      <button class="btn btn-p btn-sm" onclick="moShip('${o.id}')">Mark Shipped</button>
-    </div>`;
+    actions=moShipForm(o.id,'','','','Mark Shipped');
   }else{
     const t=o.tracking||{};
-    actions=`<span class="t-muted" style="font-size:12.5px">Shipped via ${o.courier==='spx'?'SPX':'J&T'} — ${t.link||t.number||''}</span>`;
+    const num=t.number||(t.link&&!/^https?:\/\//i.test(t.link)?t.link:'');
+    const url=/^https?:\/\//i.test(t.link||'')?t.link:'';
+    actions=`<div style="flex:1;min-width:240px"><span class="t-muted" style="font-size:12.5px">Shipped via ${o.courier==='spx'?'SPX':'J&amp;T'}${num?' · No. <b>'+num+'</b>':''}${url?' · <a href="'+url+'" target="_blank" rel="noopener" style="color:var(--lagoon);font-weight:600">tracking link</a>':''}</span></div>
+      <button class="btn btn-o btn-sm" onclick="moEditTracking('${o.id}')">Edit tracking</button>
+      <div id="mo-edit-${o.id}" style="width:100%"></div>`;
   }
   const cancelBtn=o.is_cancelled?'':`<button class="btn btn-o btn-sm" style="margin-left:auto;color:var(--danger);border-color:var(--danger)" onclick="moCancel('${o.id}')">Cancel Order</button>`;
   return `<div class="card" style="${o.is_cancelled?'opacity:.7':''}">
@@ -143,92 +141,56 @@ function moCard(o){
 
 function moStamp(o,key){return Object.assign({},o.stage_dates||{},{[key]:new Date().toISOString()});}
 
-// Must match the platform dropdown value used for storefront sales in the Sales tab.
-const MO_SALE_PLATFORM='website'; // must match the database sale_platform values (lowercase)
-
-function moTodayLocal(){
-  const d=new Date();
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-}
-
-/* Records the order in the sales ledger and deducts stock.
-   Runs once, when payment is confirmed. */
-async function moRecordSale(o){
-  const items=MO.itemsByOrder[o.id]||[];
-  const total=parseFloat(o.total)||0;
-  const platformFee=0;
-  // Net profit for own-site sales = what the customer paid, minus product cost, minus shipping.
-  const skuIds=items.filter(i=>i.sku_id).map(i=>i.sku_id);
-  const skuRows=skuIds.length?await sbGet('skus',`id=in.(${skuIds.join(',')})&select=id,current_stock,unit_cost`):[];
-  const skuById={};skuRows.forEach(r=>skuById[r.id]=r);
-  const productCost=items.reduce((sum,i)=>sum+((skuById[i.sku_id]&&parseFloat(skuById[i.sku_id].unit_cost))||0)*i.qty,0);
-  const netProfit=total-productCost-(parseFloat(o.shipping_fee)||0)-platformFee;
-  const [sale]=await sbInsert('sales',{
-    order_id:'MO-'+o.id.slice(0,8),
-    platform:MO_SALE_PLATFORM,
-    sale_date:moTodayLocal(),
-    customer_name:o.customer_name,
-    city_province:o.region_label,
-    address:o.address,
-    payment_method:o.payment_method,
-    subtotal:o.subtotal,
-    platform_fee:platformFee,
-    shipping_fee:o.shipping_fee,
-    total_amount:total,
-    net_profit:netProfit,
-    source:'Member order',
-    notes:o.notes||null
-  });
-  try{
-    const rows=items.filter(i=>i.sku_id).map(i=>({
-      sale_id:sale.id,sku_id:i.sku_id,quantity:i.qty,unit_price:i.unit_price,subtotal:i.line_total
-    }));
-    if(rows.length) await sbInsert('sale_items',rows);
-  }catch(e){
-    await sbDelete('sales',`id=eq.${sale.id}`);
-    throw e;
-  }
-  // Deduct stock the same way Take Order does: recipes are cut automatically (for example a full
-  // bar into samplers) and every step is recorded on today's date. All or nothing.
-  try{
-    await sbRpc('deduct_member_order_stock',{
-      p_sale_id:sale.id,
-      p_items:items.filter(i=>i.sku_id).map(i=>({sku_id:i.sku_id,quantity:i.qty})),
-      p_stock_date:todayPH(),
-      p_created_by:CURRENT_USER.id
-    });
-  }catch(e){
-    await sbDelete('sale_items',`sale_id=eq.${sale.id}`);
-    await sbDelete('sales',`id=eq.${sale.id}`);
-    throw e;
-  }
-  salesCache=null; // make Sales/Home/Reports tabs reload fresh
-  return sale.id;
-}
-
+/* Sales record and stock deduction happen inside the database the moment an order reaches
+   "Payment Confirmed" (trigger mcc_orders_auto_sale). All or nothing: if stock cannot be moved, the
+   stage change is refused and nothing is saved. */
 async function moAdvance(id,stage){
   const o=MO.orders.find(x=>x.id===id);
   try{
-    const patch={current_stage:stage,stage_dates:moStamp(o,stage)};
-    if(stage==='payment_confirmed' && !o.sale_id){
-      patch.sale_id=await moRecordSale(o);
-    }
-    await sbUpdate('mcc_orders',id,patch);
-    toast(stage==='payment_confirmed'?'✓ Payment confirmed, sale recorded, stock updated':'✓ Order updated');
+    await sbUpdate('mcc_orders',id,{current_stage:stage,stage_dates:moStamp(o,stage)});
+    if(stage==='payment_confirmed')salesCache=null; // Sales / Home / Reports reload with the new sale
+    toast(stage==='payment_confirmed'?'✓ Payment confirmed. Sale recorded and stock updated automatically':'✓ Order updated');
     renderMemberOrders();
   }catch(e){toast('Could not update: '+e.message);}
 }
 
+/* Ship-out form: courier, tracking number (what the customer types on the courier site) and an optional
+   full tracking link (https://...). Used when marking shipped and when editing the tracking afterwards. */
+function moShipForm(id,courier,number,link,btnLabel){
+  return `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;width:100%">
+    <div><label class="lbl" style="margin:0 0 3px">Courier</label><select class="inp" id="mo-courier-${id}" style="min-width:110px;margin:0">
+      <option value="">Choose</option><option value="spx" ${courier==='spx'?'selected':''}>SPX</option><option value="jnt" ${courier==='jnt'?'selected':''}>J&amp;T</option></select></div>
+    <div style="flex:1;min-width:170px"><label class="lbl" style="margin:0 0 3px">Tracking number <span style="color:var(--danger)">*</span></label>
+      <input class="inp" id="mo-track-${id}" placeholder="e.g. SPXPH0123456789" value="${(number||'').replace(/"/g,'&quot;')}" style="margin:0"></div>
+    <div style="flex:1.4;min-width:200px"><label class="lbl" style="margin:0 0 3px">Tracking link <span class="t-muted">(optional, starts with https://)</span></label>
+      <input class="inp" id="mo-link-${id}" placeholder="https://..." value="${(link||'').replace(/"/g,'&quot;')}" style="margin:0"></div>
+    <button class="btn btn-p btn-sm" onclick="moShip('${id}')">${btnLabel}</button>
+  </div>`;
+}
+function moEditTracking(id){
+  const o=MO.orders.find(x=>x.id===id),t=o.tracking||{};
+  const num=t.number||(t.link&&!/^https?:\/\//i.test(t.link)?t.link:'');
+  const url=/^https?:\/\//i.test(t.link||'')?t.link:'';
+  $('mo-edit-'+id).innerHTML=`<div style="margin-top:10px">${moShipForm(id,o.courier||t.type||'',num,url,'Save tracking')}</div>`;
+}
 async function moShip(id){
   const o=MO.orders.find(x=>x.id===id);
   const courier=$('mo-courier-'+id).value;
-  const val=$('mo-track-'+id).value.trim();
+  const number=$('mo-track-'+id).value.trim();
+  let link=$('mo-link-'+id).value.trim();
   if(!courier){toast('Choose a courier first.');return;}
-  if(!val){toast(courier==='spx'?'Paste the SPX tracking link.':'Enter the J&T tracking number.');return;}
-  const tracking=courier==='spx'?{type:'spx',link:val}:{type:'jnt',number:val};
+  if(!number){toast('Enter the tracking number. Customers type it on the courier website.');return;}
+  if(link){
+    if(!/^https?:\/\//i.test(link)&&/^www\./i.test(link))link='https://'+link;
+    if(!/^https?:\/\/\S+\.\S+/i.test(link)){toast('The tracking link must be a full web address starting with https://. Leave it empty if you only have the number.');return;}
+  }
+  const tracking={type:courier,number};
+  if(link)tracking.link=link;
   try{
-    await sbUpdate('mcc_orders',id,{current_stage:'shipped',stage_dates:moStamp(o,'shipped'),courier,tracking});
-    toast('✓ Marked as shipped');
+    const patch={courier,tracking};
+    if(o.current_stage!=='shipped'){patch.current_stage='shipped';patch.stage_dates=moStamp(o,'shipped');}
+    await sbUpdate('mcc_orders',id,patch);
+    toast(o.current_stage==='shipped'?'✓ Tracking saved':'✓ Marked as shipped');
     renderMemberOrders();
   }catch(e){toast('Could not update: '+e.message);}
 }

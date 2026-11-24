@@ -95,6 +95,11 @@ a{color:inherit}
 
 .tracking-box{background:var(--sand-light);border-radius:10px;padding:12px 14px;margin-top:8px;font-size:12.5px}
 .tracking-box a{color:var(--lagoon);font-weight:600;text-decoration:underline}
+.track-btn{display:inline-block;background:var(--lagoon);color:var(--pearl) !important;text-decoration:none !important;padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600}
+.copy-btn{background:white;border:1px solid var(--sand);border-radius:6px;padding:5px 10px;font-size:12px;color:var(--lagoon);font-weight:600}
+.acc-inv-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.acc-btn{flex:1;min-width:140px;padding:11px;border-radius:9px;border:1.5px solid var(--lagoon);background:transparent;color:var(--lagoon);font-size:13.5px;font-weight:500}
+.acc-btn-p{background:var(--lagoon);color:var(--pearl)}
 .tracking-num{background:white;border:1px solid var(--sand);border-radius:6px;padding:6px 10px;font-family:monospace;font-size:13px;display:inline-block;margin:6px 0;user-select:all}
 
 .order-tabs{display:flex;gap:6px;margin-bottom:1rem}
@@ -142,6 +147,7 @@ a{color:inherit}
 .platform-link{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border:1px solid var(--sand);border-radius:10px;font-size:14px;font-weight:500}
 .platform-link span.arrow{color:var(--text-muted)}
 </style>
+<link rel="stylesheet" href="/partials/invoice.css">
 </head>
 <body>
 
@@ -255,6 +261,8 @@ const SB_URL='https://cdczxunygdmswgdzkbed.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkY3p4dW55Z2Rtc3dnZHprYmVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxOTg5NjksImV4cCI6MjEwMjc3NDk2OX0.IrC05NPev5Zp6uV0DMe0gZI3boQsqXuTYSTVdyn8oWg';
 </script>
 <script src="/partials/shared.js"></script>
+<script src="/partials/invoice.js"></script>
+<script src="/partials/invoice-member.js"></script>
 <script src="/partials/account.js"></script>
 </body>
 </html>

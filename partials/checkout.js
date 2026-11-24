@@ -466,6 +466,12 @@ async function submitOrder() {
     try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
     CO.proofUrl = null;
     showConfirmation();
+    try {   // printed-receipt animation, then the invoice can be viewed or downloaded
+      const inv = mcInvoiceOrder(Object.assign({ current_stage: 'awaiting_payment_verification', created_at: new Date().toISOString() }, orderPayload), items);
+      CO.lastOrderId = inv.id;
+      const bx = $('confirm-invoice'); if (bx) bx.style.display = 'block';
+      setTimeout(() => ppShowReceipt(inv), 250);
+    } catch (e) { console.error('receipt', e); }
   } catch (e) {
     errBox.textContent = e.message; errBox.style.display = 'block'; window.scrollTo(0, 0);
   } finally {

@@ -274,18 +274,31 @@ function buildStageRows(order) {
     </div>`;
   }).join('');
 }
+/* Tracking box. The courier page needs the tracking number typed in, so the number is always shown (tap to copy).
+   A "Track my package" button opens the exact tracking page when Lois pasted a full web address (https://...);
+   otherwise it opens the courier's own tracking page. A saved value that is not a real web address is never used as a link. */
+const COURIER_INFO = { spx: { name: 'SPX', page: 'https://spx.ph/' }, jnt: { name: 'J&T', page: 'https://www.jtexpress.ph/track-and-trace' } };
+function trackingParts(order) {
+  const t = order.tracking || {}, type = order.courier || t.type;
+  const isUrl = v => /^https?:\/\/\S+$/i.test(String(v || '').trim());
+  const number = String(t.number || (t.link && !isUrl(t.link) ? t.link : '') || '').trim();
+  const url = isUrl(t.link) ? String(t.link).trim() : '';
+  return { type, courier: COURIER_INFO[type] || { name: 'the courier', page: '' }, number, url };
+}
+function copyTracking(btn, text) {
+  const done = () => { const o = btn.textContent; btn.textContent = 'Copied ✓'; setTimeout(() => { btn.textContent = o; }, 1600); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, () => {}); else done();
+}
 function buildTrackingHtml(order) {
   if (order.current_stage !== 'shipped' || !order.tracking) return '';
-  if (order.tracking.type === 'spx' && order.tracking.link) {
-    return `<div class="tracking-box">Your package is on its way. <a href="${esc(order.tracking.link)}" target="_blank" rel="noopener">Track your SPX package &rarr;</a></div>`;
-  }
-  if (order.tracking.type === 'jnt' && order.tracking.number) {
-    return `<div class="tracking-box">
-      Enter this tracking number at <a href="https://www.jtexpress.ph/track-and-trace" target="_blank" rel="noopener">jtexpress.ph/track-and-trace</a>:
-      <div class="tracking-num">${esc(order.tracking.number)}</div>
-    </div>`;
-  }
-  return '';
+  const p = trackingParts(order);
+  if (!p.number && !p.url) return '';
+  const target = p.url || p.courier.page;
+  return `<div class="tracking-box">Your package is on its way with ${esc(p.courier.name)}.
+    ${p.number ? `<div>Tracking number:</div><div class="tracking-num">${esc(p.number)}</div> <button type="button" class="copy-btn" onclick="copyTracking(this,'${esc(p.number)}')">Copy</button>` : ''}
+    ${target ? `<div style="margin-top:8px"><a class="track-btn" href="${esc(target)}" target="_blank" rel="noopener">Track my package &rarr;</a></div>` : ''}
+    ${!p.url && p.number && target ? `<div style="margin-top:6px;color:var(--text-muted)">Enter the number above on the ${esc(p.courier.name)} tracking page.</div>` : ''}
+  </div>`;
 }
 
 function renderOrderDetail(order) {
@@ -329,6 +342,8 @@ function renderOrderDetail(order) {
       <div class="detail-line"><span>Subtotal</span><span>${P(order.subtotal)}</span></div>
       <div class="detail-line"><span>Shipping fee</span><span>${P(order.shipping_fee)}</span></div>
       <div class="detail-line total"><span>Total</span><span>${P(order.total)}</span></div>
+      ${order.is_cancelled ? '' : `<div class="acc-inv-btns"><button type="button" class="acc-btn acc-btn-p" onclick="ppViewInvoice('${order.id}')">View invoice</button>
+        <button type="button" class="acc-btn" onclick="ppDownloadInvoice('${order.id}')">Download invoice</button></div>`}
     </div>
 
     <div class="card">

@@ -1,12 +1,23 @@
 /* ============================================================
-   PARTNER PORTAL: INVOICE IMAGE + RECEIPT ANIMATION
+   INVOICE IMAGE + RECEIPT ANIMATION (shared by the Partner Portal and the member account / checkout)
    ppViewInvoice(orderId)      shows the invoice as a picture (PNG) with Download and Share buttons
    ppDownloadInvoice(orderId)  saves the PNG straight to the phone or computer
    ppShowReceipt(order)        the "printed receipt" animation shown right after an order is submitted
+   Each page plugs in how to find an order and name its lines by setting INV.getOrder(id) and INV.lineLabel(item)
+   (partner-portal/invoice-partner.js, partials/invoice-member.js). Styles: /partials/invoice.css
    The PNG is drawn in the browser (canvas) with the website colors and fonts, so there is nothing to
    install and it works the same on every phone. It always reflects the latest (revised) invoice.
    ============================================================ */
-const INV = { logo: null, cache: {} };
+const INV = { logo: null, cache: {},
+  getOrder: async () => null,                                              // set by the page
+  lineLabel: i => ({ n: i.name || i.product_name || 'Item', s: i.variant || '' }) };
+const invEl = id => document.getElementById(id);
+const invEsc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function invToast(msg) {
+  if (typeof ppToast === 'function') return ppToast(msg);
+  let t = invEl('inv-toast'); if (!t) { t = document.createElement('div'); t.id = 'inv-toast'; t.className = 'inv-toast'; document.body.appendChild(t); }
+  t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 3500);
+}
 
 const INV_C = { lagoon: '#3E5F5C', lagoonDark: '#2C4542', teal: '#729A94', tealLight: '#A8C5C0', golden: '#D1A679', goldenDark: '#B8905F',
   sand: '#E6D5C3', sandLight: '#F0E8DA', pearl: '#F7F3EC', text: '#1C2E2C', mid: '#4A6862', muted: '#8FA9A4', success: '#2D6A4F' };
@@ -34,7 +45,7 @@ async function ppInvoiceCanvas(o) {
   await invFonts(); const logo = await invLoadLogo();
   const W = 1080, M = 60, SERIF = '"Cormorant Garamond", Georgia, serif', SANS = '"DM Sans", Arial, sans-serif';
   const scratch = document.createElement('canvas').getContext('2d');
-  const items = (o.items || []).map(i => { const l = ppLineLabel(i); return { name: l.n, sub: l.s, qty: i.qty, unit: i.unit_price, total: i.line_total }; });
+  const items = (o.items || []).map(i => { const l = INV.lineLabel(i); return { name: l.n, sub: l.s, qty: i.qty, unit: i.unit_price, total: i.line_total }; });
   // description column width, to wrap long names
   const colQty = 640, colPrice = 760, colTot = 1020 - 34; const descW = colQty - M - 30;
   scratch.font = `500 29px ${SANS}`; const small = `400 21px ${SANS}`;
@@ -67,7 +78,7 @@ async function ppInvoiceCanvas(o) {
   x.fillText('Invoice no. ' + (o.order_code || '') + ((o.invoice_rev || 1) > 1 ? '  ·  Revised (version ' + o.invoice_rev + ')' : ''), M, 250);
   // billed to
   x.fillStyle = INV_C.text; x.font = `600 28px ${SANS}`; x.fillText('BILLED TO', M, 312);
-  x.font = `600 36px ${SANS}`; x.fillText(String(o.business_name || (PP.partner && PP.partner.business_name) || '').toUpperCase(), M, 358);
+  x.font = `600 36px ${SANS}`; x.fillText(String(o.business_name || '').toUpperCase(), M, 358);
   x.font = `400 28px ${SANS}`; addrLines.forEach((ln, i) => x.fillText(ln, M, 408 + i * 38));
   // logo, top right
   if (logo) { const lw = 340, lh = lw * logo.height / logo.width; x.drawImage(logo, W - M - lw, 96 - lh / 2, lw, lh); }
@@ -137,14 +148,7 @@ async function ppInvoiceCanvas(o) {
 }
 
 /* ─── Getting the order and the picture ─── */
-async function invGetOrder(id) {
-  // always ask the server first, so the invoice shows the latest paid amount and any added charges
-  let o = null;
-  try { const r = await ppRest(`mcc_partner_orders?id=eq.${encodeURIComponent(id)}&select=*`); o = r && r[0]; } catch (e) { /* fall back to what we already have */ }
-  if (!o) o = (typeof PAY !== 'undefined' ? PAY.orders : []).find(x => x.id === id);
-  if (!o && typeof PP !== 'undefined' && PP.lastOrder && PP.lastOrder.id === id) o = PP.lastOrder;
-  return o;
-}
+async function invGetOrder(id) { return INV.getOrder(id); }
 function invBlob(canvas) { return new Promise(res => canvas.toBlob(b => res(b), 'image/png')); }
 async function invRender(id) {
   const o = await invGetOrder(id); if (!o) throw new Error('Order not found');
@@ -157,7 +161,7 @@ function invSave(inv) {
   const a = document.createElement('a'); a.href = inv.url; a.download = inv.name; document.body.appendChild(a); a.click(); a.remove();
 }
 async function ppDownloadInvoice(id) {
-  try { ppToast('Preparing your invoice...'); invSave(await invRender(id)); } catch (e) { ppToast('Sorry, we could not make the invoice. Please try again.'); }
+  try { invToast('Preparing your invoice...'); invSave(await invRender(id)); } catch (e) { invToast('Sorry, we could not make the invoice. Please try again.'); }
 }
 async function invShare(id) {
   try {
@@ -169,18 +173,18 @@ async function invShare(id) {
 
 /* ─── The viewer ─── */
 function invOverlay(html) {
-  let ov = ppEl('inv-overlay');
+  let ov = invEl('inv-overlay');
   if (!ov) { ov = document.createElement('div'); ov.id = 'inv-overlay'; ov.className = 'inv-overlay'; ov.onclick = e => { if (e.target === ov) invClose(); }; document.body.appendChild(ov); }
   ov.innerHTML = html; ov.classList.add('show'); document.body.style.overflow = 'hidden'; return ov;
 }
-function invClose() { const ov = ppEl('inv-overlay'); if (ov) { ov.classList.remove('show'); ov.innerHTML = ''; } document.body.style.overflow = ''; }
+function invClose() { const ov = invEl('inv-overlay'); if (ov) { ov.classList.remove('show'); ov.innerHTML = ''; } document.body.style.overflow = ''; }
 async function ppViewInvoice(id) {
   invOverlay(`<div class="inv-sheet"><button class="pk-x" onclick="invClose()" aria-label="Close">✕</button><div class="spin" style="margin:3rem auto"></div><p class="muted center" style="font-size:13px">Preparing your invoice...</p></div>`);
   try {
     const inv = await invRender(id);
     invOverlay(`<div class="inv-sheet"><button class="pk-x" onclick="invClose()" aria-label="Close">✕</button>
-      <h2 style="font-size:1.3rem;margin-bottom:10px;padding-right:34px">Invoice ${ppEsc(inv.o.order_code)}</h2>
-      <img class="inv-img" src="${inv.url}" alt="Invoice ${ppEsc(inv.o.order_code)}">
+      <h2 style="font-size:1.3rem;margin-bottom:10px;padding-right:34px">Invoice ${invEsc(inv.o.order_code)}</h2>
+      <img class="inv-img" src="${inv.url}" alt="Invoice ${invEsc(inv.o.order_code)}">
       <div class="inv-btns"><button class="btn btn-p" onclick="invSave(INV.cache[Object.keys(INV.cache).find(k => k.indexOf('${inv.o.id}:') === 0)])">⬇ Download invoice (PNG)</button>
         ${navigator.canShare ? `<button class="btn btn-o" onclick="invShare('${inv.o.id}')">Share or save to phone</button>` : ''}
         <button class="btn btn-o" onclick="invClose()">Close</button></div>
@@ -201,17 +205,17 @@ function ppShowReceipt(o) {
   const parts = [
     `<div class="rc-logo"><img src="/partials/invoice-logo.png" alt="mikecharlie"></div>`,
     `<div class="rc-c rc-b">ORDER RECEIVED</div>`,
-    `<div class="rc-c rc-s">${ppEsc(when)}</div>`,
-    `<div class="rc-c rc-b">${ppEsc(o.order_code || '')}</div>`,
+    `<div class="rc-c rc-s">${invEsc(when)}</div>`,
+    `<div class="rc-c rc-b">${invEsc(o.order_code || '')}</div>`,
     `<div class="rc-dash"></div>`,
-    ...show.map(i => { const l = ppLineLabel(i); return `<div class="rc-it"><span>${ppEsc(l.n)}${l.s ? '<em>' + ppEsc(l.s.length > 38 ? l.s.slice(0, 36) + '…' : l.s) + '</em>' : ''}</span></div><div class="rc-row rc-s"><span>${i.qty} x ${money(i.unit_price)}</span><span>${money(i.line_total)}</span></div>`; }),
+    ...show.map(i => { const l = INV.lineLabel(i); return `<div class="rc-it"><span>${invEsc(l.n)}${l.s ? '<em>' + invEsc(l.s.length > 38 ? l.s.slice(0, 36) + '…' : l.s) + '</em>' : ''}</span></div><div class="rc-row rc-s"><span>${i.qty} x ${money(i.unit_price)}</span><span>${money(i.line_total)}</span></div>`; }),
     more > 0 ? `<div class="rc-c rc-s">+ ${more} more item${more === 1 ? '' : 's'}</div>` : '',
     `<div class="rc-dash"></div>`,
     `<div class="rc-row"><span>Products</span><span>${money(o.subtotal)}</span></div>`,
     `<div class="rc-row"><span>Shipping</span><span>${o.courier === 'lbc' && !Number(o.shipping_fee) ? 'to follow' : money(o.shipping_fee)}</span></div>`,
     `<div class="rc-row rc-big"><span>TOTAL</span><span>PHP ${money(o.total)}</span></div>`,
     `<div class="rc-dash"></div>`,
-    `<div class="rc-c">Thank you, ${ppEsc((PP.partner && PP.partner.business_name) || 'partner')}!</div>`,
+    `<div class="rc-c">Thank you${o.business_name ? ', ' + invEsc(o.business_name) : ''}!</div>`,
     `<div class="rc-c rc-s">We will check your order and payment, then start preparing it.</div>`,
     `<div class="rc-bars"></div>`
   ].filter(Boolean);
@@ -220,13 +224,13 @@ function ppShowReceipt(o) {
     <div class="rc-feed"><div class="rc-paper" id="rc-paper"></div></div>
     <div class="rc-actions" id="rc-actions" style="opacity:0"><button class="btn btn-p" onclick="invClose();ppViewInvoice('${o.id}')">View invoice</button>
       <button class="btn btn-o" style="background:white" onclick="invClose()">Close</button></div></div>`);
-  const paper = ppEl('rc-paper'), acts = ppEl('rc-actions');
+  const paper = invEl('rc-paper'), acts = invEl('rc-actions');
   const done = () => { paper.classList.add('rc-torn'); acts.style.transition = 'opacity .5s'; acts.style.opacity = '1'; };
   if (reduce) { paper.innerHTML = parts.join(''); done(); return; }
   paper.classList.add('rc-printing');
   let i = 0;
   const next = () => {
-    if (!ppEl('rc-paper')) return;          // closed early
+    if (!invEl('rc-paper')) return;          // closed early
     if (i >= parts.length) { paper.classList.remove('rc-printing'); setTimeout(done, 250); return; }
     const d = document.createElement('div'); d.className = 'rc-line'; d.innerHTML = parts[i++]; paper.appendChild(d);
     setTimeout(next, parts[i - 1].indexOf('rc-logo') >= 0 ? 500 : 190);

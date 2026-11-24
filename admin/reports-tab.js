@@ -49,6 +49,7 @@ function makeLineChart(id,labels,datasets){
 function monthKey(dateStr){const d=new Date(dateStr);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
 function monthLabel(key){const [y,m]=key.split('-');return new Date(y,m-1,1).toLocaleDateString('en-PH',{month:'short',year:'2-digit'});}
 
+const advFmt=n=>n>=10?n.toFixed(1):n.toFixed(2);   // small daily volumes need the extra decimal
 function computeReports(sales){
   const now=new Date();
   const moStart=startOfMonth(now);
@@ -125,7 +126,19 @@ function computeReports(sales){
     .filter(x=>x.days!=null)
     .sort((a,b)=>a.days-b.days).slice(0,6);
 
-  return {grossMonth,netMonth,aov,feePct,months,grossByMonth,netByMonth,topSellers,slowMovers,paymentBreakdown,topCities,topCustomers,repeatRate,distinctCustomers,runwayList};
+  // ADV (Average Daily Volume) of shipping: parcels per calendar day. Every recorded sale is one parcel
+  // (Shopee, Lazada, website, partner orders, direct). Days with no parcels count as 0.
+  const dayKeys=[];
+  for(let i=29;i>=0;i--){const d=new Date(todayPH()+'T00:00:00');d.setDate(d.getDate()-i);dayKeys.push(d.toLocaleDateString('sv-SE'));}
+  const parcelsByDay={},piecesByDay={};
+  dayKeys.forEach(k=>{parcelsByDay[k]=0;piecesByDay[k]=0;});
+  sales.forEach(s=>{const k=String(s.sale_date||'').slice(0,10);if(k in parcelsByDay){parcelsByDay[k]+=1;piecesByDay[k]+=(s.sale_items||[]).reduce((n,i)=>n+(i.quantity||0),0);}});
+  const sumLast=(map,n)=>dayKeys.slice(-n).reduce((t,k)=>t+map[k],0);
+  const monthDays=Number(todayPH().slice(8,10));  // days elapsed this month, today included
+  const parcelsMonth=sales.filter(s=>String(s.sale_date||'').slice(0,7)===todayPH().slice(0,7)).length;
+  const adv={d7:sumLast(parcelsByDay,7)/7,d30:sumLast(parcelsByDay,30)/30,month:parcelsMonth/monthDays,
+    pcs30:sumLast(piecesByDay,30)/30,total30:sumLast(parcelsByDay,30),peak:Math.max(0,...dayKeys.map(k=>parcelsByDay[k])),dayKeys,parcelsByDay};
+  return {adv,grossMonth,netMonth,aov,feePct,months,grossByMonth,netByMonth,topSellers,slowMovers,paymentBreakdown,topCities,topCustomers,repeatRate,distinctCustomers,runwayList};
 }
 
 async function renderDataReports(){
@@ -148,7 +161,19 @@ async function renderDataReports(){
       <div class="stat-box"><div class="stat-num">${P(r.aov)}</div><div class="stat-lbl">Avg Order Value</div></div>
       <div class="stat-box"><div class="stat-num">${r.feePct.toFixed(1)}%</div><div class="stat-lbl">Platform Fee of Revenue</div></div>
       <div class="stat-box"><div class="stat-num">${r.repeatRate.toFixed(0)}%</div><div class="stat-lbl">Repeat Customer Rate</div></div>
+      <div class="stat-box"><div class="stat-num">${advFmt(r.adv.d30)}</div><div class="stat-lbl">ADV Shipping (parcels/day, 30d)</div></div>
     </div>
+
+    <div class="card"><div class="card-title">📦 Shipping ADV <span class="t-muted" style="font-size:11px;font-weight:400">(Average Daily Volume: parcels shipped per day)</span></div>
+      <div class="stat-strip" style="margin-bottom:10px">
+        <div class="stat-box"><div class="stat-num">${advFmt(r.adv.d7)}</div><div class="stat-lbl">Last 7 days</div></div>
+        <div class="stat-box"><div class="stat-num">${advFmt(r.adv.d30)}</div><div class="stat-lbl">Last 30 days</div></div>
+        <div class="stat-box"><div class="stat-num">${advFmt(r.adv.month)}</div><div class="stat-lbl">This month so far</div></div>
+        <div class="stat-box"><div class="stat-num">${advFmt(r.adv.pcs30)}</div><div class="stat-lbl">Pieces per day (30d)</div></div>
+        <div class="stat-box"><div class="stat-num">${r.adv.peak}</div><div class="stat-lbl">Busiest day (30d)</div></div>
+      </div>
+      <canvas id="chart-adv" height="80"></canvas>
+      <p class="t-muted" style="font-size:11px;margin-top:8px">${r.adv.total30} parcel${r.adv.total30===1?'':'s'} in the last 30 days. Each recorded sale counts as one parcel, from every platform. Days with no sales count as 0.</p></div>
 
     <div class="card"><div class="card-title">📈 Gross vs. Net Sales — Last 6 Months</div>
       <canvas id="chart-trend" height="90"></canvas></div>
@@ -188,6 +213,7 @@ async function renderDataReports(){
     $('body').innerHTML=html;
 
     // Draw charts now that canvases exist in the DOM
+    makeBarChart('chart-adv', r.adv.dayKeys.map(k=>k.slice(5)), r.adv.dayKeys.map(k=>r.adv.parcelsByDay[k]), false);
     makeLineChart('chart-trend', r.months.map(monthLabel), [
       {label:'Gross',data:r.months.map(m=>r.grossByMonth[m]),borderColor:'#3E5F5C',backgroundColor:'#3E5F5C'},
       {label:'Net',data:r.months.map(m=>r.netByMonth[m]),borderColor:'#D1A679',backgroundColor:'#D1A679'}

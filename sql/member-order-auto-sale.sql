@@ -1,0 +1,6 @@
+-- Documentation copy. Applied to Supabase as migration "member_order_auto_sale" (Nov 24, 2026).
+-- When a member/guest order (mcc_orders) reaches payment_confirmed, preparing_order or shipped and has no sale yet,
+-- this BEFORE UPDATE trigger records the sale (platform 'website', source 'Member order'), the sale items,
+-- and deducts the stock via process_sale_deduction, all in the same transaction. If stock cannot be moved the
+-- stage change fails and nothing is saved. Cancelling is still handled by the admin Member Orders tab (moCancel).
+-- See the function body in Supabase: public.mcc_orders_auto_sale().
