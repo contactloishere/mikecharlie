@@ -62,6 +62,13 @@ const SHIPPING_RATES = [
     tiers: [{ max: 0.5, fee: 100 }, { max: 3, fee: 125 }, { max: 5, fee: 170 }, { max: 6, fee: 445 }, { max: 7, fee: 515 }, { max: Infinity, fee: 590 }] },
 ];
 
+// Siquijor uses the same rates as Central Visayas (Cebu / Bohol / Negros Oriental).
+SHIPPING_RATES.push({ id: "siquijor", label: "Siquijor",
+  tiers: SHIPPING_RATES.find(r => r.id === "central_visayas_non_remote").tiers.map(t => ({ ...t })) });
+
+// Region lists (checkout, saved addresses, admin) show in alphabetical order. Lookups use the id, so order does not affect rates.
+SHIPPING_RATES.sort((a, b) => a.label.localeCompare(b.label, "en", { sensitivity: "base" }));
+
 // Partner orders only: the box and paddings add weight to the final shipping weight.
 // Added automatically; partners are not shown it.
 //   product weight up to 3 kg  -> nothing added
