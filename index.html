@@ -335,6 +335,9 @@ function groupProducts(){
     map[key].push(s);
   });
   S.groups=Object.values(map);
+  // Products show in the order set in the admin Products tab (drag to reorder). Unordered ones go last, A to Z.
+  const ord=g=>{const o=g[0].listing&&g[0].listing.sort_order;return o==null?Infinity:o;};
+  S.groups.sort((a,b)=>ord(a)-ord(b)||String(a[0].product_name).localeCompare(String(b[0].product_name),'en',{sensitivity:'base'}));
 }
 /* A product with several variants starts on "Select Variant": nothing can be added until one is picked */
 function needsPick(group){return group.length>1 && !S.variantPicked;}

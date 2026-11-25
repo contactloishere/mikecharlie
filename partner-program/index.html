@@ -595,11 +595,11 @@ function scrollToForm(){document.getElementById('inquiry-form').scrollIntoView({
 /* Live pricing for Hotel-Sized samplers, pulled straight from the Products tab */
 async function loadLivePricing(){
   try{
-    const r=await fetch(`${SB_URL}/rest/v1/skus?product_name=in.(Hotel-Sized Shampoo Bars,Hotel-Sized Body Bar Samplers)&is_active=eq.true&is_sellable=eq.true&select=product_name,retail_price_direct`,{headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}});
+    const r=await fetch(`${SB_URL}/rest/v1/skus?product_name=in.(%22Shampoo%20Bar%20Samplers%20(Hotel%20Size)%22,%22Body%20Bar%20Samplers%20(Hotel%20size)%22)&is_active=eq.true&is_sellable=eq.true&select=product_name,retail_price_direct`,{headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}});
     if(!r.ok)return;
     const rows=await r.json();
-    const shamPrices=rows.filter(x=>x.product_name==='Hotel-Sized Shampoo Bars'&&x.retail_price_direct!=null).map(x=>x.retail_price_direct);
-    const bodyPrices=rows.filter(x=>x.product_name==='Hotel-Sized Body Bar Samplers'&&x.retail_price_direct!=null).map(x=>x.retail_price_direct);
+    const shamPrices=rows.filter(x=>x.product_name==='Shampoo Bar Samplers (Hotel Size)'&&x.retail_price_direct!=null).map(x=>x.retail_price_direct);
+    const bodyPrices=rows.filter(x=>x.product_name==='Body Bar Samplers (Hotel size)'&&x.retail_price_direct!=null).map(x=>x.retail_price_direct);
     if(shamPrices.length){
       const lo=Math.min(...shamPrices),hi=Math.max(...shamPrices);
       document.getElementById('price-sham-smpl').textContent=(lo===hi?`₱${lo}`:`₱${lo}–₱${hi}`)+' / piece';

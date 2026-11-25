@@ -14,14 +14,15 @@ async function renderProducts(){
     <div style="width:32px;height:32px;border:3px solid var(--sand);border-top-color:var(--teal);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:1rem"></div>
     <p>Loading products...</p></div>`;
   try{
-    const [listings,skus,photos,recipes,cats]=await Promise.all([
+    const [listings,skus,photos,recipes,cats,tiers]=await Promise.all([
       sbGet('product_listings','select=*'),
       sbGet('skus','select=*,categories(id,name)&order=product_name.asc'),
       sbGet('variant_photos','select=sku_id,photo_url'),
       sbGet('product_recipes','select=*'),
-      sbGet('categories','select=*&order=display_order.asc')
+      sbGet('categories','select=*&order=display_order.asc'),
+      sbGet('mcc_partner_price_tiers','select=*&order=min_qty.asc')
     ]);
-    PS.listings=listings;PS.allSkus=skus;PS.categories=cats;PS.recipesAll=recipes;
+    PS.tiers=tiers;PS.listings=listings;PS.allSkus=skus;PS.categories=cats;PS.recipesAll=recipes;
     PS.photoMap={};photos.forEach(p=>{if(p.photo_url)PS.photoMap[p.sku_id]=p.photo_url;});
     renderProductsList();
   }catch(e){
@@ -46,8 +47,12 @@ function renderProductsList(){
     map[s.product_name].push(s);
   });
   PS.groups=Object.entries(map);
+  // Show the products in the order Lois set by dragging (new products without an order go last, A to Z)
+  const ord=t=>{const l=PS.listings.find(x=>x.title===t);return l&&l.sort_order!=null?l.sort_order:Infinity;};
+  PS.groups.sort((a,b)=>ord(a[0])-ord(b[0])||a[0].localeCompare(b[0],'en',{sensitivity:'base'}));
   let html=`<div class="card"><div class="card-title">🗂️ All Products</div>
     <p class="t-muted" style="font-size:13px;margin-bottom:12px">Everything here (photos, descriptions, prices, stock, recipes) is editable right from this screen. This is the only place to add or edit products.</p>
+    <p class="t-muted" style="font-size:13px;margin-bottom:12px">☰ <b>Drag a product card</b> to where you want it (or use the ‹ › arrows on a phone). This is the order your customers and partners see in the shop.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-p btn-sm" onclick="openNewListingModal(false)">+ New Product</button>
       <button class="btn btn-g btn-sm" onclick="openNewListingModal(true)">+ Preloved Item</button>
@@ -62,7 +67,8 @@ function renderProductsList(){
       const thumb=listing&&listing.cover_image_url;
       const inactiveCount=arr.filter(s=>!s.is_active).length;
       const pre=isPrelovedCatId(arr[0].category_id);
-      html+=`<div class="listing-card" onclick="openListingDetail(${idx})">
+      html+=`<div class="listing-card" draggable="true" data-title="${attrEsc(title)}" ondragstart="plDragStart(event)" ondragover="plDragOver(event)" ondragleave="plDragLeave(event)" ondrop="plDrop(event)" ondragend="plDragEnd(event)" onclick="openListingDetail(${idx})">
+        <div class="pl-move" onclick="event.stopPropagation()"><button title="Move earlier" onclick="plMove(${idx},-1)">‹</button><span class="pl-grip">☰</span><button title="Move later" onclick="plMove(${idx},1)">›</button></div>
         <div class="listing-thumb">${thumb?`<img src="${attrEsc(thumb)}">`:'🌿'}</div>
         <div class="listing-info">
           <div class="listing-title">${title}</div>
@@ -73,6 +79,43 @@ function renderProductsList(){
     html+=`</div>`;
   }
   $('body').innerHTML=html;
+}
+
+/* ─── Drag to reorder products. The order is saved on each listing (sort_order) and used by the shop and the partner shop. ─── */
+let PL_DRAG=null;
+function plDragStart(e){PL_DRAG=e.currentTarget.dataset.title;e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain',PL_DRAG);}catch(x){}e.currentTarget.style.opacity='.45';}
+function plDragOver(e){if(PL_DRAG==null)return;e.preventDefault();e.currentTarget.classList.add('pl-over');}
+function plDragLeave(e){e.currentTarget.classList.remove('pl-over');}
+function plDragEnd(e){e.currentTarget.style.opacity='';document.querySelectorAll('.pl-over').forEach(x=>x.classList.remove('pl-over'));}
+function plDrop(e){
+  e.preventDefault();e.currentTarget.classList.remove('pl-over');
+  const to=e.currentTarget.dataset.title,from=PL_DRAG;PL_DRAG=null;
+  if(from==null||from===to)return;
+  const arr=PS.groups.map(g=>g[0]),fi=arr.indexOf(from),ti=arr.indexOf(to);
+  arr.splice(fi,1);arr.splice(ti,0,from);
+  plSaveOrder(arr);
+}
+function plMove(idx,d){
+  const arr=PS.groups.map(g=>g[0]),j=idx+d;if(j<0||j>=arr.length)return;
+  const t=arr[idx];arr.splice(idx,1);arr.splice(j,0,t);plSaveOrder(arr);
+}
+async function plSaveOrder(titles){
+  const changed=[];
+  titles.forEach((t,i)=>{
+    const l=PS.listings.find(x=>x.title===t);
+    if(l){if(l.sort_order!==i+1){l.sort_order=i+1;changed.push(['u',l]);}}
+    else changed.push(['i',{title:t,sort_order:i+1}]);
+  });
+  // show the new order straight away, then save it
+  PS.groups.sort((a,b)=>titles.indexOf(a[0])-titles.indexOf(b[0]));
+  renderProductsList();
+  try{
+    for(const [k,l] of changed){
+      if(k==='u')await sbUpdate('product_listings',l.id,{sort_order:l.sort_order});
+      else{const saved=await sbInsert('product_listings',l);PS.listings.push(saved[0]);}
+    }
+    toast('✓ Order saved');
+  }catch(e){toast('Could not save the order: '+e.message);}
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -162,6 +205,8 @@ function openListingDetail(idx){
     _isNew:false
   }));
   PS.draft=null;
+  PS.ws=(PS.tiers||[]).filter(t=>t.product_name===title).map(t=>({id:t.id,variant:t.variant||'',min_qty:t.min_qty,unit_price:Number(t.unit_price)}));
+  PS.wsGone=[];
   PS.sharedSettings=deriveSharedSettings(PS.variants);
   PS.expandedId=null;
   PS.newVariantCounter=0;
@@ -200,6 +245,7 @@ function readGeneralFromDom(){
 }
 
 function renderListingDetail(){
+  wsRead();
   // Keep anything typed but not yet saved in the General card when the page redraws
   if($('pl-title'))PS.draft=readGeneralFromDom();
   const l=Object.assign({},PS.currentListing,PS.draft?PS.draft.listing:{});
@@ -251,6 +297,8 @@ function renderListingDetail(){
     <p class="t-muted" style="font-size:11px;margin:-8px 0 12px">Used to work out shipping on shop and partner orders. Leave it empty to keep the weights as they are.</p>
     <label class="lbl">Ribbon Text</label>
     <input class="inp" id="ls-ribbon" value="${attrEsc(s.ribbon_text)}" placeholder="e.g. Bestseller, New Arrival">
+    <label class="lbl">Wholesale prices (partners)</label>
+    <div id="ws-box">${wsHtml()}</div>
     <button class="btn btn-p" id="gen-save-btn" style="margin-top:4px" onclick="saveGeneral()">Save General</button>
     <p class="t-muted" style="font-size:11px;margin-top:8px">${PS.variants.filter(v=>!v._isNew).length} existing variant(s) will get the Category, Location, Unit Cost, Low Stock Threshold and Ribbon Text above. Variants you add later start with these values too.</p>
   </div>`;
@@ -260,6 +308,54 @@ function renderListingDetail(){
   html+=`<button class="btn btn-g btn-block" onclick="addNewVariant()">+ Add Variant</button></div>`;
 
   $('body').innerHTML=html;
+}
+
+/* ─── Wholesale prices (partner price tiers) for this product ─── */
+function wsHtml(){
+  const rows=(PS.ws||[]).map((r,i)=>`<div class="ws-row">
+      <input class="inp" id="ws-qty-${i}" type="number" min="1" step="1" value="${r.min_qty!==''&&r.min_qty!=null?r.min_qty:''}" placeholder="From qty">
+      <input class="inp" id="ws-price-${i}" type="number" min="0" step="0.01" value="${r.unit_price!==''&&r.unit_price!=null?r.unit_price:''}" placeholder="₱ each">
+      <input class="inp" id="ws-var-${i}" value="${attrEsc(r.variant||'')}" placeholder="All variants">
+      <button class="btn btn-g btn-sm" title="Remove" onclick="wsRemove(${i})">✕</button></div>`).join('');
+  return `<p class="t-muted" style="font-size:11px;margin:0 0 8px">Price per piece once a partner orders at least the quantity shown. Add one row per price level. Leave the last box empty so it applies to every variant, or type a variant name (use % as a wildcard, for example %with Pouch). Partners order below the first level at the normal price. Click Save General to keep your changes.</p>
+    ${rows?`<div class="ws-row ws-head"><span>From qty</span><span>₱ each</span><span>Variant (optional)</span><span></span></div>${rows}`:'<p class="t-muted" style="font-size:12.5px;margin:0 0 8px">No wholesale prices for this product yet.</p>'}
+    <button class="btn btn-g btn-sm" onclick="wsAdd()">+ Add price level</button>`;
+}
+function wsRead(){
+  if(!PS.ws||!$('ws-box'))return;
+  PS.ws.forEach((r,i)=>{
+    const q=$('ws-qty-'+i);if(!q)return;
+    r.min_qty=q.value;r.unit_price=$('ws-price-'+i).value;r.variant=$('ws-var-'+i).value;
+  });
+}
+function wsAdd(){wsRead();PS.ws.push({id:null,variant:'',min_qty:'',unit_price:''});$('ws-box').innerHTML=wsHtml();}
+function wsRemove(i){wsRead();const r=PS.ws.splice(i,1)[0];if(r&&r.id)PS.wsGone.push(r.id);$('ws-box').innerHTML=wsHtml();}
+/* Saves the wholesale rows. Returns an error text, or '' when fine. */
+function wsValidate(){
+  wsRead();const seen=new Set();
+  for(const r of PS.ws){
+    const q=Number(r.min_qty),p=Number(r.unit_price);
+    if(!Number.isInteger(q)||q<1)return 'Each wholesale row needs a whole-number "From qty" of 1 or more.';
+    if(r.unit_price===''||!(p>=0))return 'Each wholesale row needs a price.';
+    const k=q+'|'+String(r.variant||'').trim().toLowerCase();
+    if(seen.has(k))return 'Two wholesale rows have the same quantity and variant.';
+    seen.add(k);
+  }
+  return '';
+}
+async function wsSave(oldTitle,newTitle){
+  if(oldTitle!==newTitle){
+    const r=await fetch(`${SB_URL}/rest/v1/mcc_partner_price_tiers?product_name=eq.${encodeURIComponent(oldTitle)}`,{method:'PATCH',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify({product_name:newTitle})});
+    if(!r.ok)throw new Error('Saved, but the wholesale prices could not follow the new title.');
+    (PS.tiers||[]).forEach(t=>{if(t.product_name===oldTitle)t.product_name=newTitle;});
+  }
+  for(const id of PS.wsGone||[])await sbDelete('mcc_partner_price_tiers','id=eq.'+id);
+  PS.tiers=(PS.tiers||[]).filter(t=>!(PS.wsGone||[]).includes(t.id));PS.wsGone=[];
+  for(const r of PS.ws){
+    const row={product_name:newTitle,variant:String(r.variant||'').trim()||null,min_qty:Number(r.min_qty),unit_price:Number(r.unit_price)};
+    if(r.id){await sbUpdate('mcc_partner_price_tiers',r.id,row);const t=PS.tiers.find(x=>x.id===r.id);if(t)Object.assign(t,row);}
+    else{const saved=await sbInsert('mcc_partner_price_tiers',row);r.id=saved[0].id;PS.tiers.push(saved[0]);}
+  }
 }
 
 const RESERVED_SLUGS=['admin','account','checkout','preloved','hotel-portal','partner-portal','hotel-partner-program','partner-program','privacy','api','partials','sql','index','robots','sitemap','favicon'];
@@ -297,6 +393,7 @@ async function saveGeneral(){
     payload['subsection_'+n+'_body']=dom.listing['subsection_'+n+'_body'].trim()||null;
   }
   const shared=dom.shared;
+  const wsErr=wsValidate();if(wsErr){toast(wsErr);return;}
 
   const btn=$('gen-save-btn');
   const orig=btn?btn.textContent:null;
@@ -331,6 +428,8 @@ async function saveGeneral(){
       });
       if(!r.ok)throw new Error(await r.text());
     }
+    // 4. Wholesale prices
+    await wsSave(oldTitle,newTitle);
     PS.sharedSettings=shared;
     PS.draft=null;
     PS.variants.forEach(v=>Object.assign(v,weightPatch(shared)));

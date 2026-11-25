@@ -5,7 +5,13 @@
    works out the real prices again when the order is placed.
    Variant choosing for products with many variants is in picker.js.
    ============================================================ */
-const SHOP = { loaded: false, skus: [], tiers: [], sets: [], cover: {}, vphoto: {}, products: [] };
+const SHOP = { loaded: false, skus: [], tiers: [], sets: [], cover: {}, vphoto: {}, products: [], alts: {} };
+/* A photo that fails to load is replaced by the next one for that product, then by the leaf icon. */
+function ppImgFail(img) {
+  const list = SHOP.alts[img.dataset.p] || [], next = (parseInt(img.dataset.i, 10) || 0) + 1;
+  if (next < list.length) { img.dataset.i = next; img.src = list[next]; }
+  else { img.onerror = null; img.replaceWith(document.createTextNode('🌿')); }
+}
 
 async function ppRest(path) {
   // Owner view: the admin login can see every partner, so narrow to the partner being viewed
@@ -22,7 +28,7 @@ async function ppLoadShop() {
         ppRest('categories?select=id,name').catch(() => []),
         ppRest('mcc_partner_price_tiers?select=product_name,variant,min_qty,unit_price&order=min_qty.asc'),
         ppRest('mcc_partner_sets?is_active=eq.true&select=*&order=sort.asc'),
-        ppRest('product_listings?select=title,cover_image_url').catch(() => []),
+        ppRest('product_listings?select=title,cover_image_url,sort_order').catch(() => []),
         ppRest('variant_photos?select=sku_id,photo_url').catch(() => [])
       ]);
       // Preloved / decluttering / garage sale items are for retail customers only, never in the partner shop
@@ -33,7 +39,10 @@ async function ppLoadShop() {
       SHOP.vphoto = {}; vp.forEach(v => { if (v.photo_url) SHOP.vphoto[v.sku_id] = v.photo_url; });
       const by = {};
       skus.forEach(s => { (by[s.product_name] = by[s.product_name] || []).push(s); });
-      SHOP.products = Object.keys(by).map(name => ({ name, skus: by[name] }));
+      // Same order as the shop (set by dragging in the admin Products tab); unordered ones go last, A to Z
+      const ord = {}; listings.forEach(l => { if (l.sort_order != null) ord[l.title] = l.sort_order; });
+      SHOP.products = Object.keys(by).map(name => ({ name, skus: by[name] }))
+        .sort((a, b) => (ord[a.name] ?? Infinity) - (ord[b.name] ?? Infinity) || a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }));
     }
 }
 
@@ -117,14 +126,17 @@ function ppSetCard(st) {
 function ppProductCard(pr) {
   const prices = pr.skus.map(ppBase);
   const lo = Math.min(...prices), hi = Math.max(...prices);
-  const photo = pr.skus.map(s => SHOP.vphoto[s.id]).find(Boolean) || SHOP.cover[pr.name];
+  // Cover photo first, then the variants' photos. If one does not load, the next is tried (see ppImgFail).
+  const photos = [SHOP.cover[pr.name], ...pr.skus.map(s => SHOP.vphoto[s.id])].filter((u, i, a) => u && a.indexOf(u) === i);
+  SHOP.alts[pr.name] = photos;
+  const photo = photos[0];
   const multi = pr.skus.length > 1;
   const act = multi
     ? `<button class="btn btn-p btn-s" onclick="ppOpenPicker('${ppEsc(pr.name).replace(/'/g, "\\'")}')">Choose variants</button>`
     : `<div class="stepper"><button onclick="ppStep(this,-1)">−</button><input type="number" min="1" value="1" inputmode="numeric"><button onclick="ppStep(this,1)">+</button>
         <button class="btn btn-p btn-s" style="flex:1" onclick="ppAddSingle('${pr.skus[0].id}',this)">Add</button></div>`;
   return `<div class="pcard">
-    <div class="pimg">${photo ? `<img src="${ppEsc(photo)}" referrerpolicy="no-referrer" alt="">` : '🌿'}</div>
+    <div class="pimg">${photo ? `<img src="${ppEsc(photo)}" referrerpolicy="strict-origin-when-cross-origin" loading="lazy" alt="" data-p="${ppEsc(pr.name)}" data-i="0" onerror="ppImgFail(this)">` : '🌿'}</div>
     <div class="pbody">
       <div class="pname">${ppEsc(pr.name)}</div>
       <div class="pprice">${lo === hi ? `<b>${P(lo)}</b>` : `<b>${P(lo)}</b> to <b>${P(hi)}</b>`} each</div>
