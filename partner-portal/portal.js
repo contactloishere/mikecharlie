@@ -58,6 +58,15 @@ function renderPortal(p) {
         <button class="btn btn-p" style="width:auto;padding:10px 20px" onclick="location.reload()">Check again</button>
         <a class="btn btn-o" style="width:auto;padding:10px 20px;text-decoration:none" href="https://wa.me/message/T7LXVS3L74A5C1" target="_blank">Message us</a>
         <button class="btn btn-o" style="width:auto;padding:10px 20px" onclick="doLogout()">Log Out</button></div></div></div>`;
+    // The page opens by itself once approved: check every 20 seconds (and when they come back to the tab)
+    if (!window.PP_APPROVAL_POLL) {
+      const chk = async () => {
+        if (document.hidden) return;
+        try { const r = await ppRest('mcc_partners?id=eq.' + PP.session.user.id + '&select=is_approved'); if (r[0] && r[0].is_approved) location.reload(); } catch (e) {}
+      };
+      window.PP_APPROVAL_POLL = setInterval(chk, 20000);
+      document.addEventListener('visibilitychange', chk);
+    }
     return;
   }
   ppLoadDraft(); ppRememberPartner();
