@@ -349,6 +349,17 @@ async function wsSave(oldTitle,newTitle){
     if(!r.ok)throw new Error('Saved, but the wholesale prices could not follow the new title.');
     (PS.tiers||[]).forEach(t=>{if(t.product_name===oldTitle)t.product_name=newTitle;});
   }
+  // Partner sets list their contents by product name, so they follow a rename too
+  if(oldTitle!==newTitle){
+    const sets=await sbGet('mcc_partner_sets','select=set_key,contents');
+    for(const st of sets){
+      const list=Array.isArray(st.contents)?st.contents:[];
+      if(!list.some(c=>c.product_name===oldTitle))continue;
+      const fixed=list.map(c=>c.product_name===oldTitle?{...c,product_name:newTitle}:c);
+      const r=await fetch(`${SB_URL}/rest/v1/mcc_partner_sets?set_key=eq.${encodeURIComponent(st.set_key)}`,{method:'PATCH',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify({contents:fixed})});
+      if(!r.ok)throw new Error('Saved, but the partner sets could not follow the new title.');
+    }
+  }
   for(const id of PS.wsGone||[])await sbDelete('mcc_partner_price_tiers','id=eq.'+id);
   PS.tiers=(PS.tiers||[]).filter(t=>!(PS.wsGone||[]).includes(t.id));PS.wsGone=[];
   for(const r of PS.ws){
